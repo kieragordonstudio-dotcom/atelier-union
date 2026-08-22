@@ -1,0 +1,16 @@
+{
+  "name": "Atelier Union",
+  "short_name": "Atelier Union",
+  "description": "A fictional premium nail salon concept website in Aberdeen.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F0E9",
+  "theme_color": "#681D27",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml"
+    }
+  ]
+}
