@@ -50,6 +50,15 @@ function getInitialTreatment(params: URLSearchParams) {
   );
 }
 
+function getInitialProduct(params: URLSearchParams, treatment: Treatment): ProductOn {
+  const value = params.get('product');
+  if (!treatment.allowsProductRemoval) return 'none';
+  if (value && Object.prototype.hasOwnProperty.call(productRemoval, value)) {
+    return value as ProductOn;
+  }
+  return 'none';
+}
+
 function getInitialAddOns(params: URLSearchParams, treatment: Treatment) {
   const look = getLookById(params.get('look'));
   const ids = [params.get('addon'), look?.addOn].filter(Boolean) as AddOnId[];
@@ -65,8 +74,9 @@ function formatSlot(slot: AvailabilitySlot | null) {
 
 export function BookingShell() {
   const [params] = useSearchParams();
+  const paramsKey = params.toString();
   const panelRef = useRef<HTMLElement>(null);
-  const initialTreatment = useMemo(() => getInitialTreatment(params), [params]);
+  const initialTreatment = useMemo(() => getInitialTreatment(params), [paramsKey]);
   const initialArtist = getArtistById(params.get('artist'))?.id as
     | ArtistChoice
     | undefined;
@@ -79,7 +89,9 @@ export function BookingShell() {
   const [selectedAddOns, setSelectedAddOns] = useState<AddOnId[]>(() =>
     getInitialAddOns(params, initialTreatment),
   );
-  const [productOn, setProductOn] = useState<ProductOn>('none');
+  const [productOn, setProductOn] = useState<ProductOn>(() =>
+    getInitialProduct(params, initialTreatment),
+  );
   const [artistId, setArtistId] = useState<ArtistChoice>(initialArtist ?? 'any');
   const initialSlot = nextAvailable(initialArtist ?? 'any') ?? null;
   const [selectedDate, setSelectedDate] = useState(
@@ -89,7 +101,7 @@ export function BookingShell() {
     initialSlot?.group ?? 'Afternoon',
   );
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(
-    initialSlot,
+    null,
   );
   const [compatibilityMessage, setCompatibilityMessage] = useState('');
   const [customer, setCustomer] = useState<CustomerDetails>({
@@ -111,6 +123,22 @@ export function BookingShell() {
       setProductOn('none');
     }
   }, [selectedTreatment]);
+
+  useEffect(() => {
+    const nextTreatment = getInitialTreatment(params);
+    const nextArtist = (getArtistById(params.get('artist'))?.id ??
+      'any') as ArtistChoice;
+    const nextSlot = nextAvailable(nextArtist) ?? null;
+    setStep(0);
+    setSelectedTreatment(nextTreatment);
+    setSelectedCategory(nextTreatment.category);
+    setSelectedAddOns(getInitialAddOns(params, nextTreatment));
+    setProductOn(getInitialProduct(params, nextTreatment));
+    setArtistId(nextArtist);
+    setSelectedDate(nextSlot?.date ?? bookableDates[0].date);
+    setTimeGroup(nextSlot?.group ?? 'Afternoon');
+    setSelectedSlot(null);
+  }, [paramsKey]);
 
   useEffect(() => {
     panelRef.current?.scrollIntoView({ block: 'start' });
@@ -146,6 +174,18 @@ export function BookingShell() {
         ? current.filter((currentId) => currentId !== id)
         : [...current, id],
     );
+    setSelectedSlot(null);
+  }
+
+  function chooseTreatment(treatment: Treatment) {
+    setSelectedTreatment(treatment);
+    setSelectedCategory(treatment.category);
+    setSelectedSlot(null);
+  }
+
+  function chooseProduct(product: ProductOn) {
+    setProductOn(product);
+    setSelectedSlot(null);
   }
 
   function chooseNextSlot(slot: AvailabilitySlot | null) {
@@ -218,9 +258,9 @@ export function BookingShell() {
             setSelectedCategory={setSelectedCategory}
             visibleTreatments={visibleTreatments}
             selectedTreatment={selectedTreatment}
-            setSelectedTreatment={setSelectedTreatment}
+            setSelectedTreatment={chooseTreatment}
             productOn={productOn}
-            setProductOn={setProductOn}
+            setProductOn={chooseProduct}
             selectedAddOns={selectedAddOns}
             toggleAddOn={toggleAddOn}
             compatibilityMessage={compatibilityMessage}

@@ -27,8 +27,8 @@ const recommendationOptions = [
   },
   {
     label: 'I already have product that needs removed',
-    result: 'We’ll help you add the right removal option →',
-    to: '/book?treatment=gel-manicure-removal',
+    result: 'Tell us what’s already on your nails →',
+    to: '/treatments#treatment-finder',
   },
 ];
 
@@ -83,7 +83,7 @@ export function HomePage() {
           <SectionHeading
             eyebrow="OUR WORK"
             title="The work speaks first."
-            copy="From barely-there finishes to detailed nail art, every appointment starts with the nails you actually want to wear."
+            copy="From natural finishes to detailed nail art, explore different shapes, colours and finishes."
           />
           <div className="signature-grid">
             {signatureLooks.map((look) => (
@@ -106,7 +106,7 @@ export function HomePage() {
       <section className="section tight">
         <div className="container">
           <SectionHeading
-            title="Find your treatment."
+            title="Find your treatment"
             copy="Not sure what to book? Tell us what you want from your nails and we’ll point you in the right direction."
           />
           <div className="category-list">
@@ -115,7 +115,7 @@ export function HomePage() {
                 <h3>{category.label}</h3>
                 <p>{category.description}</p>
                 <Link className="text-link" to={`/treatments#${category.id}`}>
-                  View
+                  View {category.label}
                 </Link>
               </article>
             ))}
@@ -141,7 +141,7 @@ export function HomePage() {
 
       <section className="section">
         <div className="container">
-          <SectionHeading title="Signature treatments." />
+          <SectionHeading title="Signature treatments" />
           <div className="feature-grid">
             {featuredTreatments.map((treatment) => (
               <article className="feature-card" key={treatment.id}>
@@ -151,6 +151,9 @@ export function HomePage() {
                   <span>{treatment.duration} min</span>
                   <span>£{treatment.price}</span>
                 </div>
+                <Link className="text-link feature-action" to={`/book?treatment=${treatment.id}`}>
+                  Book this treatment →
+                </Link>
               </article>
             ))}
           </div>
@@ -166,9 +169,8 @@ export function HomePage() {
             <p className="eyebrow">THE STUDIO STANDARD</p>
             <h2>There is a difference in the details.</h2>
             <p className="lead">
-              Every appointment follows the same seven-step standard — from
-              thorough preparation and precise shaping to the final check before
-              you leave.
+              Every appointment follows the same seven-step standard. Thorough
+              preparation, precise shaping and a final check before you leave.
             </p>
             <p className="muted">
               No rushed finishes. No skipped preparation. Every appointment is
@@ -242,7 +244,7 @@ export function HomePage() {
         <div className="container">
           <SectionHeading
             eyebrow="EXAMPLE CLIENT NOTES"
-            title="Client notes."
+            title="Client notes"
             copy="Illustrative content for this concept website."
           />
           <div className="review-grid">
@@ -255,6 +257,9 @@ export function HomePage() {
           </div>
           <div className="button-row" style={{ marginTop: 'var(--space-8)' }}>
             <ButtonLink to="/reviews">Read client notes</ButtonLink>
+            <ButtonLink to="/reviews#write-review" tone="ghost">
+              Write a review
+            </ButtonLink>
           </div>
         </div>
       </section>
@@ -263,11 +268,8 @@ export function HomePage() {
         <div className="container studio-standard-grid">
           <div>
             <p className="eyebrow">UNION STREET</p>
-            <h2>In the centre of Aberdeen.</h2>
-            <p className="lead">
-              Union Street, Aberdeen — central, easy to reach and designed for
-              appointment-led visits.
-            </p>
+            <h2>Find us on Union Street</h2>
+            <p className="lead">Union Street, Aberdeen. Right in the city centre.</p>
           </div>
           <figure className="image-frame" style={{ aspectRatio: '16 / 10' }}>
             <img

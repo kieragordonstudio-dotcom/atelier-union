@@ -25,8 +25,8 @@ export function StudioPage() {
             <p className="eyebrow">THE STUDIO</p>
             <h1>A different kind of nail appointment.</h1>
             <p className="lead">
-              Calm, appointment-led and built around the health of your natural
-              nails as much as the finished result.
+              Calm, thorough and built around the health of your natural nails
+              as much as the finished result.
             </p>
           </div>
           <figure className="image-frame">
@@ -95,8 +95,8 @@ export function StudioPage() {
           <div>
             <SectionHeading
               eyebrow="UNION STREET"
-              title="Quietly central."
-              copy="Union Street, Aberdeen — central, easy to reach and designed for appointment-led visits."
+              title="Find us on Union Street"
+              copy="Union Street, Aberdeen. Right in the city centre."
             />
             <div className="category-list">
               {siteConfig.openingHours.map((row) => (
