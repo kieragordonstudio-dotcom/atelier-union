@@ -36,9 +36,12 @@ export function Header({ quiet = false }: { quiet?: boolean }) {
         }`}
       >
         <div className="header-inner">
-          <Link className="wordmark" to="/" onClick={() => setOpen(false)}>
-            {siteConfig.name}
-          </Link>
+          <div className="brand-lockup">
+            <Link className="wordmark" to="/" onClick={() => setOpen(false)}>
+              {siteConfig.name}
+            </Link>
+            <span className="concept-marker">Concept website</span>
+          </div>
           <nav className="desktop-nav" aria-label="Primary navigation">
             {navItems.slice(0, -1).map((item) => (
               <NavLink key={item.to} to={item.to}>

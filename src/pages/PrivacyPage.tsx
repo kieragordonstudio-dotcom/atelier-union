@@ -5,14 +5,14 @@ export function PrivacyPage() {
     <>
       <Seo
         title="Privacy"
-        description="Privacy information for the fictional Atelier Union concept website."
+        description="Privacy information for the Atelier Union concept website."
       />
       <section className="page-hero">
         <div className="container">
           <p className="eyebrow">PRIVACY</p>
-          <h1>Demo privacy notice.</h1>
+          <h1>Privacy notice.</h1>
           <p className="lead">
-            This concept site does not send booking details to a live salon or
+            This concept booking form does not send details to a real salon or
             payment provider.
           </p>
         </div>
@@ -23,7 +23,7 @@ export function PrivacyPage() {
             <h3>Information requested</h3>
             <p>
               The mock booking form asks for name, mobile and email to demonstrate
-              a realistic salon workflow. The data is not transmitted to a backend.
+              a realistic salon booking journey. The details stay on the page.
             </p>
           </article>
           <article className="info-panel">
@@ -34,10 +34,10 @@ export function PrivacyPage() {
             </p>
           </article>
           <article className="info-panel">
-            <h3>Template use</h3>
+            <h3>For a live salon</h3>
             <p>
-              If this template becomes a live business website, connect forms,
-              payments and analytics only after adding a real privacy policy.
+              A real salon website would connect forms and payments only after
+              adding its own privacy policy.
             </p>
           </article>
         </div>

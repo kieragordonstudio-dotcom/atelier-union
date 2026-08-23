@@ -39,7 +39,7 @@ export const artists: Artist[] = [
     image: '/images/artist-isla.webp',
     specialties: ['Extensions', 'Occasion sets', 'Fine-detail art'],
     profile:
-      'Known for extensions, occasion sets and precise fine-detail art.',
+      'Known for extensions, occasion sets and fine-detail art.',
     selectedWork: ['Extensions', 'Detailed Art', 'Evening Red'],
     nextAvailable: 'Tuesday, 15:30',
   },

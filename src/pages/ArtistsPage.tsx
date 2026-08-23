@@ -7,15 +7,15 @@ export function ArtistsPage() {
     <>
       <Seo
         title="Meet your artist"
-        description="Meet the fictional Atelier Union nail artists and book by specialist."
+        description="Meet the Atelier Union nail artists and book by specialist."
       />
       <section className="page-hero">
         <div className="container">
           <p className="eyebrow">THE ARTISTS</p>
           <h1>Meet your artist.</h1>
           <p className="lead">
-            Choose a point of view, or select Any Nail Artist in booking for the
-            best availability.
+            Choose a specialist, or select Any Nail Artist to see the earliest
+            appointments.
           </p>
         </div>
       </section>

@@ -13,8 +13,8 @@ export function BookingPage() {
           <p className="eyebrow">BOOKING</p>
           <h1>Book without uncertainty.</h1>
           <p className="lead">
-            Demo booking: treatment, artist, time and total stay visible at every
-            step. No real payment will be taken.
+            Choose a treatment, artist and time with the price and appointment
+            length visible throughout. No real payment will be taken.
           </p>
         </div>
       </section>

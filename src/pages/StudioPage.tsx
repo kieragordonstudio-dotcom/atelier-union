@@ -7,7 +7,7 @@ const standards = [
   'Consultation before product selection',
   'Sterilised metal tools for every client',
   'Single-use files and buffers where appropriate',
-  'Precise shaping before colour',
+  'Careful shaping before colour',
   'Final inspection under clean light',
   'Aftercare notes before leaving',
 ];
@@ -23,10 +23,10 @@ export function StudioPage() {
         <div className="container page-hero-grid">
           <div>
             <p className="eyebrow">THE STUDIO</p>
-            <h1>A precision beauty studio, not a nail bar.</h1>
+            <h1>A different kind of nail appointment.</h1>
             <p className="lead">
-              Appointment-led, carefully reset and designed around natural-nail
-              health as much as the finished look.
+              Calm, appointment-led and built around the health of your natural
+              nails as much as the finished result.
             </p>
           </div>
           <figure className="image-frame">
@@ -39,9 +39,10 @@ export function StudioPage() {
         <div className="container studio-standard-grid">
           <div>
             <p className="eyebrow">THE STUDIO STANDARD</p>
-            <h2>Every appointment follows a fixed rhythm.</h2>
+            <h2>Every appointment. The same standard.</h2>
             <p className="lead">
-              The result should feel effortless, but the process is deliberate.
+              The finished result should feel effortless. The process behind it
+              is anything but rushed.
             </p>
           </div>
           <div className="process-list">
@@ -59,8 +60,12 @@ export function StudioPage() {
         <div className="container policy-grid">
           <article className="info-panel">
             <p className="eyebrow">Hygiene</p>
-            <h3>Clean without feeling clinical.</h3>
-            <p>{siteConfig.hygiene}</p>
+            <h3>Clean between every client.</h3>
+            <p>
+              Tools are sterilised for every client, single-use items are
+              replaced after each appointment, and every desk is cleaned and
+              reset before the next service.
+            </p>
           </article>
           <article className="info-panel">
             <p className="eyebrow">Product philosophy</p>
@@ -91,7 +96,7 @@ export function StudioPage() {
             <SectionHeading
               eyebrow="UNION STREET"
               title="Quietly central."
-              copy="The fictional studio is positioned on Union Street, Aberdeen, close to city-centre transport and planned as an appointment-only destination."
+              copy="Union Street, Aberdeen — central, easy to reach and designed for appointment-led visits."
             />
             <div className="category-list">
               {siteConfig.openingHours.map((row) => (

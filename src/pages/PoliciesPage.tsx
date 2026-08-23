@@ -6,14 +6,14 @@ export function PoliciesPage() {
     <>
       <Seo
         title="Policies"
-        description="Fictional Atelier Union booking, cancellation, hygiene and finish guarantee policies."
+        description="Atelier Union booking, cancellation, hygiene and finish guarantee policies."
       />
       <section className="page-hero">
         <div className="container">
           <p className="eyebrow">POLICIES</p>
           <h1>Clear before you arrive.</h1>
           <p className="lead">
-            Demonstration policy copy for the concept booking journey.
+            The practical things to know before booking.
           </p>
         </div>
       </section>
@@ -31,8 +31,12 @@ export function PoliciesPage() {
           </article>
           <article className="info-panel">
             <p className="eyebrow">Hygiene</p>
-            <h3>Every appointment reset</h3>
-            <p>{siteConfig.hygiene}</p>
+            <h3>Clean between every client.</h3>
+            <p>
+              Tools are sterilised for every client, single-use items are
+              replaced after each appointment, and every desk is cleaned and
+              reset before the next service.
+            </p>
           </article>
           <article className="info-panel">
             <p className="eyebrow">Guarantee</p>

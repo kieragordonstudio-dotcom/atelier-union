@@ -6,15 +6,14 @@ export function ReviewsPage() {
     <>
       <Seo
         title="Client notes"
-        description="Fictional demonstration reviews for the Atelier Union concept website."
+        description="Illustrative client notes for the Atelier Union concept website."
       />
       <section className="page-hero">
         <div className="container">
           <p className="eyebrow">CLIENT NOTES</p>
-          <h1>What clients say.</h1>
+          <h1>Client notes.</h1>
           <p className="lead">
-            These are illustrative reviews for the concept site. They are not
-            verified Google, Trustpilot or third-party reviews.
+            Illustrative content for this concept website.
           </p>
         </div>
       </section>

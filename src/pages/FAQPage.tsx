@@ -31,7 +31,7 @@ const faqs: FAQItem[] = [
   {
     question: 'What happens if I am late?',
     answer:
-      'Late arrival may reduce the finish available or require rescheduling if the service can no longer be completed properly.',
+      'If you arrive late, we may need to simplify the service or reschedule if there is no longer enough time to complete it properly.',
   },
   {
     question: 'Can you repair one broken nail?',
@@ -54,7 +54,7 @@ const faqs: FAQItem[] = [
   {
     question: 'Can I choose my Nail Artist?',
     answer:
-      'Yes. You can choose Maya, Sophie or Isla, or select Any Nail Artist for the best availability.',
+      'Yes. You can choose Maya, Sophie or Isla, or select Any Nail Artist to see the earliest appointments.',
   },
   {
     question: 'How often should builder gel be infilled?',

@@ -1,7 +1,7 @@
 const trustItems = [
-  '4.9 ★ client rating',
   '7-day finish guarantee',
   'Specialist nail artists',
+  'Clear prices before booking',
   'Sterilised tools for every client',
 ];
 

@@ -57,12 +57,12 @@ export const treatmentCategories: Array<{
   {
     id: 'extensions',
     label: 'Extensions',
-    description: 'Considered length, shape and structure.',
+    description: 'Added length, shape and lightweight structure.',
   },
   {
     id: 'pedicures',
     label: 'Pedicures',
-    description: 'Care, preparation and immaculate colour.',
+    description: 'Care, preparation and polished colour.',
   },
   {
     id: 'addons',
@@ -115,7 +115,7 @@ export const treatments: Treatment[] = [
   {
     id: 'builder-gel-new',
     category: 'builder',
-    name: 'Builder Gel - New Set',
+    name: 'Builder Gel Manicure',
     shortName: 'Builder Gel',
     description:
       'Builder gel overlay designed to strengthen natural nails, finished with colour.',
@@ -129,7 +129,7 @@ export const treatments: Treatment[] = [
   {
     id: 'builder-gel-infill',
     category: 'builder',
-    name: 'Builder Gel - Infill',
+    name: 'Builder Gel Infill',
     shortName: 'Builder Infill',
     description: 'Rebalance and refresh an existing builder-gel set.',
     duration: 60,
@@ -177,7 +177,7 @@ export const treatments: Treatment[] = [
     category: 'pedicures',
     name: 'Signature Pedicure',
     shortName: 'Pedicure',
-    description: 'Detailed preparation, foot care and traditional polish.',
+    description: 'Thorough preparation, foot care and traditional polish.',
     duration: 55,
     price: 50,
     featured: true,
@@ -188,7 +188,7 @@ export const treatments: Treatment[] = [
     category: 'pedicures',
     name: 'Gel Pedicure',
     shortName: 'Gel Pedicure',
-    description: 'Detailed preparation, foot care and gel colour.',
+    description: 'Thorough preparation, foot care and gel colour.',
     duration: 60,
     price: 58,
     finderTags: ['pedicure', 'colour'],
@@ -247,7 +247,7 @@ export const addOns: AddOn[] = [
   {
     id: 'minimal-art',
     name: 'Minimal Nail Art',
-    description: 'Small details on selected nails. Final price depends on design.',
+    description: 'Small accents on selected nails. Final price depends on design.',
     duration: 15,
     price: 12,
     priceLabel: 'from +£12',
@@ -269,10 +269,10 @@ export const productRemoval: Record<
   ProductOn,
   { label: string; duration: number; price: number }
 > = {
-  none: { label: 'No product currently on', duration: 0, price: 0 },
-  gel: { label: 'Gel removal', duration: 20, price: 14 },
-  builder: { label: 'Builder gel removal', duration: 30, price: 18 },
-  extensions: { label: 'Extension removal', duration: 30, price: 20 },
+  none: { label: 'Nothing', duration: 0, price: 0 },
+  gel: { label: 'Gel', duration: 20, price: 14 },
+  builder: { label: 'Builder gel / BIAB', duration: 30, price: 18 },
+  extensions: { label: 'Extensions', duration: 30, price: 20 },
 };
 
 export function getTreatmentById(id?: string | null) {

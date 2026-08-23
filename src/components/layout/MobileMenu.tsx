@@ -34,7 +34,7 @@ export function MobileMenu({
       <div className="mobile-menu-meta">
         <span>{siteConfig.address.line1}, {siteConfig.address.city}</span>
         <span>{siteConfig.openingHours[0].days} - {siteConfig.openingHours[5].days}</span>
-        <span>{siteConfig.phone}</span>
+        <span>{siteConfig.contactPlaceholder}</span>
       </div>
     </aside>
   );

@@ -1,5 +1,5 @@
 import { CalendarPlus, Check, MapPin } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { siteConfig } from '../../config/site';
 import { artists, getArtistById } from '../../data/artists';
@@ -65,6 +65,7 @@ function formatSlot(slot: AvailabilitySlot | null) {
 
 export function BookingShell() {
   const [params] = useSearchParams();
+  const panelRef = useRef<HTMLElement>(null);
   const initialTreatment = useMemo(() => getInitialTreatment(params), [params]);
   const initialArtist = getArtistById(params.get('artist'))?.id as
     | ArtistChoice
@@ -110,6 +111,10 @@ export function BookingShell() {
       setProductOn('none');
     }
   }, [selectedTreatment]);
+
+  useEffect(() => {
+    panelRef.current?.scrollIntoView({ block: 'start' });
+  }, [step]);
 
   const total = calculateBookingTotal(
     selectedTreatment,
@@ -195,7 +200,7 @@ export function BookingShell() {
 
   return (
     <div className="booking-shell">
-      <section className="booking-panel" aria-live="polite">
+      <section className="booking-panel" aria-live="polite" ref={panelRef}>
         <div className="booking-steps" aria-label="Booking progress">
           {steps.map((label, index) => (
             <span
@@ -228,8 +233,7 @@ export function BookingShell() {
             artistId={artistId}
             setArtistId={(id) => {
               setArtistId(id);
-              const slot = nextAvailable(id);
-              if (slot) chooseNextSlot(slot);
+              setSelectedSlot(null);
             }}
             onBack={goBack}
             onNext={goNext}
@@ -329,7 +333,7 @@ function TreatmentStep({
 }) {
   return (
     <>
-      <p className="eyebrow">Demo booking</p>
+      <p className="eyebrow">Appointment details</p>
       <h1 className="serif" style={{ fontSize: 'var(--step-3)' }}>
         What would you like to book?
       </h1>
@@ -372,7 +376,7 @@ function TreatmentStep({
 
       {selectedTreatment.allowsProductRemoval ? (
         <div style={{ marginTop: 'var(--space-8)' }}>
-          <p className="eyebrow">Do you currently have product on your nails?</p>
+          <p className="eyebrow">Do you already have product on your nails?</p>
           <div className="finder-grid">
             {(Object.keys(productRemoval) as ProductOn[]).map((key) => (
               <button
@@ -385,8 +389,8 @@ function TreatmentStep({
                 <br />
                 <span className="muted">
                   {productRemoval[key].duration
-                    ? `+${productRemoval[key].duration} min · +£${productRemoval[key].price}`
-                    : 'No extra time'}
+                    ? `Removal adds ${productRemoval[key].duration} min · +£${productRemoval[key].price}`
+                    : 'No removal needed'}
                 </span>
               </button>
             ))}
@@ -413,7 +417,7 @@ function TreatmentStep({
                   <br />
                   <span className="muted">
                     {compatible
-                      ? `+${addOn.duration} min · ${addOn.priceLabel}`
+                      ? `${addOn.priceLabel} · adds ${addOn.duration} min`
                       : 'Not compatible with this treatment'}
                   </span>
                 </button>
@@ -460,8 +464,8 @@ function ArtistStep({
           onClick={() => setArtistId('any')}
         >
           <h3>Any Nail Artist</h3>
-          <p>Show me the best availability.</p>
-          <span className="price">Recommended</span>
+          <p>Show me the earliest availability.</p>
+          <span className="price">Earliest appointments</span>
         </button>
         {artists.map((artist) => (
           <button
@@ -659,6 +663,9 @@ function ConfirmStep({
       </h1>
       <article className="info-panel">
         <h3>{selectedTreatment.name}</h3>
+        {total.removal.price ? (
+          <p>{total.removal.label} removal</p>
+        ) : null}
         {total.addOns.map((addOn) => (
           <p key={addOn.id}>{addOn.name}</p>
         ))}
@@ -669,7 +676,7 @@ function ConfirmStep({
           <br />
           {total.duration} min
           <br />
-          {formatPrice(total.price)}
+          Total {formatPrice(total.price)}
         </p>
       </article>
       <form className="form-grid" style={{ marginTop: 'var(--space-6)' }}>
@@ -716,11 +723,11 @@ function ConfirmStep({
         </label>
       </form>
       <div className="demo-payment">
-        <p className="eyebrow">Demo payment</p>
+        <p className="eyebrow">Payment summary</p>
         <h3>£15 deposit required</h3>
         <p className="muted">Deducted from your final bill. No payment will be taken.</p>
         <div className="summary-row">
-          <span>Appointment total</span>
+          <span>Total</span>
           <strong>{formatPrice(total.price)}</strong>
         </div>
         <div className="summary-row">
@@ -728,7 +735,7 @@ function ConfirmStep({
           <strong>{formatPrice(deposit)}</strong>
         </div>
         <div className="summary-row">
-          <span>Due at studio</span>
+          <span>Pay at the salon</span>
           <strong>{formatPrice(dueAtStudio)}</strong>
         </div>
       </div>
@@ -744,7 +751,7 @@ function ConfirmStep({
           Back
         </Button>
         <Button tone="accent" onClick={onConfirm} disabled={!canConfirm}>
-          Confirm demo appointment
+          Confirm appointment
         </Button>
       </div>
     </>
@@ -775,6 +782,7 @@ function BookingComplete({
   const addOnText = total.addOns.length
     ? ` + ${total.addOns.map((addOn) => addOn.name).join(', ')}`
     : '';
+  const dueAtSalon = Math.max(total.price - deposit, 0);
   return (
     <>
       <div className="complete-mark" aria-hidden="true">
@@ -788,6 +796,7 @@ function BookingComplete({
           {selectedTreatment.name}
           {addOnText}
         </h3>
+        {total.removal.price ? <p>{total.removal.label} removal</p> : null}
         <p>
           {formatSlot(selectedSlot)}
           <br />
@@ -801,14 +810,17 @@ function BookingComplete({
           {siteConfig.address.line1}, {siteConfig.address.city}
         </p>
         <p>
-          £15 deposit
-          <br />£{Math.max(total.price - deposit, 0)} due at the studio
+          Total: {formatPrice(total.price)}
+          <br />
+          Pay today: {formatPrice(deposit)}
+          <br />
+          Pay at the salon: {formatPrice(dueAtSalon)}
         </p>
       </article>
       <p className="muted">
-        Please arrive five minutes before your appointment. If you are wearing
-        product that was not included in your booking, contact the studio before
-        arriving.
+        No real payment has been taken. Please arrive five minutes before your
+        appointment. If you are wearing product that was not included in your
+        booking, contact the studio before arriving.
       </p>
       <div className="button-row">
         <Button tone="accent" onClick={onAddCalendar}>
@@ -834,8 +846,8 @@ function BookingComplete({
       {cancelMessage ? (
         <div className="info-panel" style={{ marginTop: 'var(--space-6)' }}>
           <p>
-            Demo cancellation only. In a live site this would open a secure
-            cancellation flow.
+            This is a concept booking. A live salon site would open a secure
+            cancellation flow here.
           </p>
         </div>
       ) : null}
@@ -870,7 +882,7 @@ function BookingSummary({
       </div>
       {total.removal.price ? (
         <div className="summary-row">
-          <span>{productRemoval[productOn].label}</span>
+          <span>{productRemoval[productOn].label} removal</span>
           <strong>+{formatPrice(total.removal.price)}</strong>
         </div>
       ) : null}

@@ -8,7 +8,7 @@ export const reviews: Review[] = [
   {
     name: 'Claire M.',
     treatment: 'Builder Gel',
-    body: 'My nails looked immaculate but still like my own nails. The appointment felt calm and properly considered.',
+    body: 'My nails looked polished but still like my own nails. The appointment felt calm and unhurried.',
   },
   {
     name: 'Aisha K.',
@@ -48,6 +48,6 @@ export const reviews: Review[] = [
   {
     name: 'Jade P.',
     treatment: 'Builder Infill',
-    body: 'Four weeks later the structure still looked balanced. Very precise work.',
+    body: 'Four weeks later the structure still looked balanced. Very careful work.',
   },
 ];

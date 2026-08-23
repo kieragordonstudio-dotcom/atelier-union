@@ -28,7 +28,7 @@ export function Footer() {
               <br />
               {siteConfig.address.country}
             </p>
-            <p>{siteConfig.phone}</p>
+            <p>{siteConfig.contactPlaceholder}</p>
           </div>
           <div className="footer-links" aria-label="Footer navigation">
             {footerLinks.map((link) => (
@@ -44,8 +44,7 @@ export function Footer() {
           </div>
         </div>
         <p className="footer-small">
-          {siteConfig.demoDisclaimer} This site omits live business schema to avoid
-          representing the demonstration salon as a real trading business.
+          {siteConfig.demoDisclaimer}
         </p>
       </div>
     </footer>

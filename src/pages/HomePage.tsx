@@ -12,22 +12,22 @@ import { treatmentCategories, treatments } from '../data/treatments';
 const recommendationOptions = [
   {
     label: 'I want stronger natural nails',
-    result: 'Recommend Builder Gel.',
+    result: 'Builder Gel is probably right for you →',
     to: '/book?treatment=builder-gel-new',
   },
   {
-    label: 'I want extra length',
-    result: 'Recommend Extensions.',
+    label: 'I want longer nails',
+    result: 'Take a look at Extensions →',
     to: '/book?treatment=soft-gel-extensions',
   },
   {
     label: 'I want colour on my natural nails',
-    result: 'Recommend Gel Manicure.',
+    result: 'A Gel Manicure is a good place to start →',
     to: '/book?treatment=signature-gel',
   },
   {
     label: 'I already have product that needs removed',
-    result: 'Choose the matching removal option during booking.',
+    result: 'We’ll help you add the right removal option →',
     to: '/book?treatment=gel-manicure-removal',
   },
 ];
@@ -66,12 +66,11 @@ export function HomePage() {
                 Explore treatments
               </ButtonLink>
             </div>
-            <p className="trust-line">4.9 ★ · Loved by our clients</p>
           </div>
           <figure className="image-frame hero-media">
             <img
               src="/images/hero-manicure.webp"
-              alt="Editorial close-up of immaculate manicured hands."
+              alt="Close-up of manicured hands with a deep red finish."
             />
           </figure>
         </div>
@@ -84,7 +83,7 @@ export function HomePage() {
           <SectionHeading
             eyebrow="OUR WORK"
             title="The work speaks first."
-            copy="From immaculate natural finishes to considered detail work, every set is shaped around the person wearing it."
+            copy="From barely-there finishes to detailed nail art, every appointment starts with the nails you actually want to wear."
           />
           <div className="signature-grid">
             {signatureLooks.map((look) => (
@@ -108,7 +107,7 @@ export function HomePage() {
         <div className="container">
           <SectionHeading
             title="Find your treatment."
-            copy="You do not need to know the terminology. Start with what you want from your nails."
+            copy="Not sure what to book? Tell us what you want from your nails and we’ll point you in the right direction."
           />
           <div className="category-list">
             {treatmentCategories.map((category) => (
@@ -125,7 +124,7 @@ export function HomePage() {
           <div className="recommendation">
             <div>
               <p className="eyebrow">Not sure what to book?</p>
-              <h2>Start with the outcome.</h2>
+              <h2>Start with what you want.</h2>
             </div>
             <div className="recommendation-options">
               {recommendationOptions.map((option) => (
@@ -142,7 +141,7 @@ export function HomePage() {
 
       <section className="section">
         <div className="container">
-          <SectionHeading title="The essentials." />
+          <SectionHeading title="Signature treatments." />
           <div className="feature-grid">
             {featuredTreatments.map((treatment) => (
               <article className="feature-card" key={treatment.id}>
@@ -167,8 +166,9 @@ export function HomePage() {
             <p className="eyebrow">THE STUDIO STANDARD</p>
             <h2>There is a difference in the details.</h2>
             <p className="lead">
-              Every appointment follows the same considered process, from
-              preparation to final inspection.
+              Every appointment follows the same seven-step standard — from
+              thorough preparation and precise shaping to the final check before
+              you leave.
             </p>
             <p className="muted">
               No rushed finishes. No skipped preparation. Every appointment is
@@ -190,7 +190,7 @@ export function HomePage() {
         <div className="container">
           <SectionHeading
             eyebrow="THE ARTISTS"
-            title="Expertise, with a point of view."
+            title="Meet the artists behind the work."
           />
           <div className="artist-grid">
             {artists.map((artist) => (
@@ -217,26 +217,33 @@ export function HomePage() {
           <figure className="image-frame" style={{ aspectRatio: '4 / 5' }}>
             <img
               src="/images/treatment-process.webp"
-              alt="A precise manicure treatment in progress."
+              alt="A manicure treatment in progress."
               loading="lazy"
             />
           </figure>
           <div>
             <p className="eyebrow">HYGIENE</p>
-            <h2>A calm studio, reset for every client.</h2>
+            <h2>Immaculate means more than the finish.</h2>
             <p className="lead">{siteConfig.hygiene}</p>
-            <p>{siteConfig.guarantee}</p>
             <ButtonLink to="/studio">See the studio standard</ButtonLink>
           </div>
+        </div>
+      </section>
+
+      <section className="section tight finish-guarantee">
+        <div className="container">
+          <p className="eyebrow">THE FINISH GUARANTEE</p>
+          <h2>If something isn’t right, we’ll put it right.</h2>
+          <p className="lead">{siteConfig.guarantee}</p>
         </div>
       </section>
 
       <section className="section">
         <div className="container">
           <SectionHeading
-            eyebrow="CLIENT NOTES"
-            title="Clear, calm and exacting."
-            copy="Fictional demonstration reviews, written to show the tone and structure of the finished template."
+            eyebrow="EXAMPLE CLIENT NOTES"
+            title="Client notes."
+            copy="Illustrative content for this concept website."
           />
           <div className="review-grid">
             {reviews.slice(0, 3).map((review) => (
@@ -258,12 +265,9 @@ export function HomePage() {
             <p className="eyebrow">UNION STREET</p>
             <h2>In the centre of Aberdeen.</h2>
             <p className="lead">
-              A quiet appointment-led studio on Union Street, with clear pricing,
-              considered aftercare and booking that takes less than a minute.
+              Union Street, Aberdeen — central, easy to reach and designed for
+              appointment-led visits.
             </p>
-            <ButtonLink to="/book" tone="accent">
-              Book an appointment
-            </ButtonLink>
           </div>
           <figure className="image-frame" style={{ aspectRatio: '16 / 10' }}>
             <img
@@ -272,6 +276,25 @@ export function HomePage() {
               loading="lazy"
             />
           </figure>
+        </div>
+      </section>
+
+      <section className="section final-cta">
+        <div className="container final-cta-inner">
+          <p className="eyebrow">BOOKING</p>
+          <h2>Ready for your next set?</h2>
+          <p className="lead">
+            Choose your treatment, artist and appointment time in just a few
+            steps.
+          </p>
+          <div className="button-row">
+            <ButtonLink to="/book" tone="dark">
+              Book an appointment
+            </ButtonLink>
+            <ButtonLink to="/treatments" tone="dark">
+              Explore treatments
+            </ButtonLink>
+          </div>
         </div>
       </section>
     </>

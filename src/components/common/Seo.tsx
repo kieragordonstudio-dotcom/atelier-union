@@ -25,6 +25,7 @@ export function Seo({ title, description }: SeoProps) {
     setMeta('meta[property="og:description"]', description);
     setMeta('meta[name="twitter:title"]', fullTitle);
     setMeta('meta[name="twitter:description"]', description);
+    setMeta('meta[name="robots"]', 'noindex, nofollow');
 
     const canonicalHref = `${siteConfig.url}${location.pathname}`;
     let canonical = document.head.querySelector<HTMLLinkElement>(
