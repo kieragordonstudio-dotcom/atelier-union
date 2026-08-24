@@ -21,7 +21,6 @@ import { Button } from '../common/Button';
 
 const steps = ['Treatment', 'Artist', 'Date & Time', 'Confirm', 'Booked'];
 const groups: TimeGroup[] = ['Morning', 'Afternoon', 'Evening'];
-const deposit = 15;
 
 type ArtistChoice = string;
 type TimeGroup = 'Morning' | 'Afternoon' | 'Evening';
@@ -53,7 +52,6 @@ type AvailabilityResponse = {
   slots: AvailabilitySlot[];
 };
 const availabilityStart = startOfToday();
-const availabilityEnd = addDays(availabilityStart, 120);
 
 type CustomerDetails = {
   fullName: string;
@@ -97,8 +95,12 @@ function formatSlot(slot: AvailabilitySlot | null) {
   return slot ? `${slot.fullDisplay} · ${slot.time}` : 'Not selected';
 }
 
+function formatBookingPrice(value: number) {
+  return `£${Number.isInteger(value) ? value : value.toFixed(2)}`;
+}
+
 export function BookingShell() {
-  const { addOns, artists, treatmentCategories, treatments, website } = usePublicData();
+  const { addOns, artists, bookingSettings, treatmentCategories, treatments, website } = usePublicData();
   const [params] = useSearchParams();
   const paramsKey = params.toString();
   const panelRef = useRef<HTMLElement>(null);
@@ -171,6 +173,7 @@ export function BookingShell() {
     selectedAddOns,
     productOn,
   );
+  const deposit = bookingSettings.depositPence / 100;
 
   const selectedArtist = artistId === 'any' ? null : artists.find((artist) => artist.id === artistId);
   const visibleTreatments = treatments.filter(
@@ -251,6 +254,8 @@ export function BookingShell() {
 
   function addToCalendar() {
     if (!selectedSlot) return;
+    const startsAt = new Date(selectedSlot.startsAt);
+    const endsAt = new Date(startsAt.getTime() + total.duration * 60_000);
     const title = `${selectedTreatment.name} at ${website.salonName}`;
     const description = `${selectedTreatment.name} ${total.addOns
       .map((addOn) => addOn.name)
@@ -259,12 +264,14 @@ export function BookingShell() {
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'BEGIN:VEVENT',
+      `DTSTART:${formatIcsDate(startsAt)}`,
+      `DTEND:${formatIcsDate(endsAt)}`,
       `SUMMARY:${title}`,
       `DESCRIPTION:${description}`,
       `LOCATION:${website.addressLine1}, ${website.city}`,
       'END:VEVENT',
       'END:VCALENDAR',
-    ].join('\n');
+    ].join('\r\n');
     const blob = new Blob([ics], { type: 'text/calendar' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -342,6 +349,7 @@ export function BookingShell() {
             onBack={goBack}
             onNext={goNext}
             onChangeArtist={() => setStep(1)}
+            maximumAdvanceDays={bookingSettings.maximumAdvanceDays}
           />
         ) : null}
 
@@ -359,6 +367,8 @@ export function BookingShell() {
             canConfirm={Boolean(canConfirm && selectedSlot)}
             bookingError={bookingError}
             submitting={submitting}
+            deposit={deposit}
+            cancellationCutoffHours={bookingSettings.cancellationCutoffHours}
           />
         ) : null}
 
@@ -373,6 +383,7 @@ export function BookingShell() {
             onChange={resetBooking}
             cancelMessage={cancelMessage}
             setCancelMessage={setCancelMessage}
+            deposit={deposit}
           />
         ) : null}
       </section>
@@ -596,6 +607,7 @@ function TimeStep({
   onBack,
   onNext,
   onChangeArtist,
+  maximumAdvanceDays,
 }: {
   selectedTreatment: Treatment;
   selectedAddOns: AddOnId[];
@@ -611,6 +623,7 @@ function TimeStep({
   onBack: () => void;
   onNext: () => void;
   onChangeArtist: () => void;
+  maximumAdvanceDays: number;
 }) {
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [availabilityError, setAvailabilityError] = useState('');
@@ -639,6 +652,7 @@ function TimeStep({
     timeGroup,
     availability?.slots ?? [],
   );
+  const availabilityEnd = addDays(availabilityStart, maximumAdvanceDays);
   const firstCalendarMonth = startOfMonth(availabilityStart);
   const lastCalendarMonth = startOfMonth(availabilityEnd);
   const previousMonthDisabled = calendarMonth <= firstCalendarMonth;
@@ -735,6 +749,7 @@ function TimeStep({
               dateKey,
               availability?.days ?? [],
               loadingAvailability,
+              availabilityEnd,
             );
             const outsideMonth = date.getMonth() !== calendarMonth.getMonth();
             const selected = selectedDate === dateKey;
@@ -894,6 +909,7 @@ function getAvailabilityStatus(
   date: string,
   days: AvailabilityDay[],
   loading: boolean,
+  availabilityEnd: Date,
 ) {
   const firstDate = toDateKey(availabilityStart);
   const lastDate = toDateKey(availabilityEnd);
@@ -927,6 +943,10 @@ function getAvailabilityStatus(
   return { tone: 'full', label: 'Fully booked', shortLabel: 'Full', disabled: true };
 }
 
+function formatIcsDate(date: Date) {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
 function findNextDateWithSlot(
   selectedDate: string,
   timeGroup: TimeGroup,
@@ -951,6 +971,8 @@ function ConfirmStep({
   canConfirm,
   bookingError,
   submitting,
+  deposit,
+  cancellationCutoffHours,
 }: {
   selectedTreatment: Treatment;
   total: ReturnType<typeof calculateBookingTotal>;
@@ -964,6 +986,8 @@ function ConfirmStep({
   canConfirm: boolean;
   bookingError: string;
   submitting: boolean;
+  deposit: number;
+  cancellationCutoffHours: number;
 }) {
   const dueAtStudio = Math.max(total.price - deposit, 0);
   return (
@@ -1034,7 +1058,7 @@ function ConfirmStep({
       </form>
       <div className="demo-payment">
         <p className="eyebrow">Payment summary</p>
-        <h3>£15 deposit required</h3>
+        <h3>{formatBookingPrice(deposit)} deposit required</h3>
         <p className="muted">Deducted from your final bill. No payment will be taken.</p>
         <div className="summary-row">
           <span>Total</span>
@@ -1042,16 +1066,16 @@ function ConfirmStep({
         </div>
         <div className="summary-row">
           <span>Pay today</span>
-          <strong>{formatPrice(deposit)}</strong>
+          <strong>{formatBookingPrice(deposit)}</strong>
         </div>
         <div className="summary-row">
           <span>Pay at the salon</span>
-          <strong>{formatPrice(dueAtStudio)}</strong>
+          <strong>{formatBookingPrice(dueAtStudio)}</strong>
         </div>
       </div>
       <p className="muted">
-        Free changes up to 24 hours before your appointment. Cancellations within
-        24 hours may result in the loss of the £15 deposit.{' '}
+        Free changes up to {cancellationCutoffHours} hours before your appointment. Cancellations within
+        {' '}{cancellationCutoffHours} hours may result in the loss of the {formatBookingPrice(deposit)} deposit.{' '}
         <Link className="text-link" to="/policies">
           View full cancellation policy
         </Link>
@@ -1083,6 +1107,7 @@ function BookingComplete({
   onChange,
   cancelMessage,
   setCancelMessage,
+  deposit,
 }: {
   selectedTreatment: Treatment;
   total: ReturnType<typeof calculateBookingTotal>;
@@ -1093,6 +1118,7 @@ function BookingComplete({
   onChange: () => void;
   cancelMessage: boolean;
   setCancelMessage: (value: boolean) => void;
+  deposit: number;
 }) {
   const { website } = usePublicData();
   const addOnText = total.addOns.length
@@ -1128,9 +1154,9 @@ function BookingComplete({
         <p>
           Total: {formatPrice(total.price)}
           <br />
-          Pay today: {formatPrice(deposit)}
+          Pay today: {formatBookingPrice(deposit)}
           <br />
-          Pay at the salon: {formatPrice(dueAtSalon)}
+          Pay at the salon: {formatBookingPrice(dueAtSalon)}
         </p>
       </article>
       <p className="muted">

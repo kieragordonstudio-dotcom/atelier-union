@@ -32,10 +32,12 @@ export function publicRoutes(context: DatabaseContext) {
                 addon.duration_minutes AS add_on_duration_minutes,
                 artist.name AS artist_name
            FROM lookbook_entries l
-           JOIN services treatment ON treatment.id=l.treatment_id AND treatment.active=true
-           LEFT JOIN services addon ON addon.id=l.add_on_id AND addon.active=true
+           JOIN services treatment ON treatment.id=l.treatment_id
+             AND treatment.business_id=l.business_id AND treatment.active=true
+           LEFT JOIN services addon ON addon.id=l.add_on_id AND addon.business_id=l.business_id
            LEFT JOIN artists artist ON artist.id=l.artist_id
           WHERE l.business_id=$1 AND l.published=true AND l.active=true
+            AND (l.add_on_id IS NULL OR addon.active=true)
           ORDER BY l.sort_order, l.name`,
         [businessId],
       );

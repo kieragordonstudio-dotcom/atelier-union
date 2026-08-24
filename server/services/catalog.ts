@@ -2,13 +2,14 @@ import { and, asc, eq } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import {
   artists,
+  businessSettings,
   serviceCategories,
   services,
   websiteSettings,
 } from '../db/schema.js';
 
 export async function getPublicCatalog(db: Database, businessId: string) {
-  const [categories, serviceRows, artistRows, websiteRows] = await Promise.all([
+  const [categories, serviceRows, artistRows, websiteRows, bookingSettingsRows] = await Promise.all([
     db
       .select()
       .from(serviceCategories)
@@ -34,6 +35,15 @@ export async function getPublicCatalog(db: Database, businessId: string) {
       .select()
       .from(websiteSettings)
       .where(eq(websiteSettings.businessId, businessId))
+      .limit(1),
+    db
+      .select({
+        depositPence: businessSettings.depositPence,
+        cancellationCutoffHours: businessSettings.cancellationCutoffHours,
+        maximumAdvanceDays: businessSettings.maximumAdvanceDays,
+      })
+      .from(businessSettings)
+      .where(eq(businessSettings.businessId, businessId))
       .limit(1),
   ]);
 
@@ -79,5 +89,10 @@ export async function getPublicCatalog(db: Database, businessId: string) {
       selectedWork: artist.selectedWork,
     })),
     website: websiteRows[0] ?? null,
+    bookingSettings: bookingSettingsRows[0] ?? {
+      depositPence: 1500,
+      cancellationCutoffHours: 24,
+      maximumAdvanceDays: 120,
+    },
   };
 }

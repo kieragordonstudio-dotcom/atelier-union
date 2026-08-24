@@ -19,7 +19,14 @@ type PublicData = {
   treatmentCategories: Category[];
   lookbook: Look[];
   website: PublicWebsite;
+  bookingSettings: PublicBookingSettings;
   ready: boolean;
+};
+
+export type PublicBookingSettings = {
+  depositPence: number;
+  cancellationCutoffHours: number;
+  maximumAdvanceDays: number;
 };
 
 export type PublicWebsite = {
@@ -68,6 +75,12 @@ const fallbackWebsite: PublicWebsite = {
   contactLabel: siteConfig.contactPlaceholder,
 };
 
+const fallbackBookingSettings: PublicBookingSettings = {
+  depositPence: 1500,
+  cancellationCutoffHours: 24,
+  maximumAdvanceDays: 120,
+};
+
 const fallback: PublicData = {
   artists: fallbackArtists,
   treatments: fallbackTreatments,
@@ -75,6 +88,7 @@ const fallback: PublicData = {
   treatmentCategories: fallbackCategories,
   lookbook: fallbackLookbook,
   website: fallbackWebsite,
+  bookingSettings: fallbackBookingSettings,
   ready: false,
 };
 
@@ -137,6 +151,7 @@ export function PublicDataProvider({ children }: { children: React.ReactNode }) 
       })),
       lookbook: looks ?? fallbackLookbook,
       website,
+      bookingSettings: catalog.bookingSettings ?? fallbackBookingSettings,
       ready: true,
     };
   }, [catalog, looks]);

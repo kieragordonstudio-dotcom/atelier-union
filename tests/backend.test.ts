@@ -10,9 +10,11 @@ import { createApp } from '../server/app.js';
 import {
   appointments,
   businessMemberships,
+  businessSettings,
   clients,
   lookbookEntries,
   payments,
+  services,
   timeOff,
   users,
   workingHours,
@@ -120,6 +122,29 @@ test('availability observes working hours and time off', async () => {
   }
 });
 
+test('public catalog exposes current booking settings', async () => {
+  const context = await createTestDatabase();
+  try {
+    const business = await seedBusiness(context, { slug: 'atelier-union', name: 'Atelier Union' });
+    await seedBookingSetup(context, business.id);
+    await context.db.update(businessSettings).set({
+      depositPence: 2200,
+      cancellationCutoffHours: 36,
+      maximumAdvanceDays: 90,
+    }).where(eq(businessSettings.businessId, business.id));
+    const app = createApp(config, context, { sessionStore: new session.MemoryStore(), serveFrontend: false });
+
+    const catalog = await request(app).get('/api/public/catalog').expect(200);
+    assert.deepEqual(catalog.body.bookingSettings, {
+      depositPence: 2200,
+      cancellationCutoffHours: 36,
+      maximumAdvanceDays: 90,
+    });
+  } finally {
+    await context.pool.end();
+  }
+});
+
 test('booking creation prevents overlap, matches clients, and supports cancellation', async () => {
   const context = await createTestDatabase();
   try {
@@ -158,6 +183,22 @@ test('booking creation prevents overlap, matches clients, and supports cancellat
     assert.equal(ledger.find((payment) => payment.kind === 'balance')?.amountPence, 2700);
     assert.equal(ledger.reduce((sum, payment) => sum + payment.amountPence, 0), 4200);
 
+    await updateAppointment(context.pool, business.id, first.id, { paymentStatus: 'refunded' });
+    await updateAppointment(context.pool, business.id, first.id, { paymentStatus: 'refunded' });
+    const fullRefundLedger = await context.db.select().from(payments).where(eq(payments.appointmentId, first.id));
+    assert.equal(fullRefundLedger.length, 3);
+    assert.equal(fullRefundLedger.find((payment) => payment.kind === 'refund')?.amountPence, -4200);
+    assert.equal(fullRefundLedger.reduce((sum, payment) => sum + payment.amountPence, 0), 0);
+
+    await updateAppointment(context.pool, business.id, second.id, { paymentStatus: 'deposit_recorded' });
+    await updateAppointment(context.pool, business.id, second.id, { paymentStatus: 'refunded' });
+    await updateAppointment(context.pool, business.id, second.id, { paymentStatus: 'refunded' });
+    const depositRefundLedger = await context.db.select().from(payments).where(eq(payments.appointmentId, second.id));
+    assert.equal(depositRefundLedger.length, 2);
+    assert.equal(depositRefundLedger.find((payment) => payment.kind === 'deposit')?.amountPence, 1500);
+    assert.equal(depositRefundLedger.find((payment) => payment.kind === 'refund')?.amountPence, -1500);
+    assert.equal(depositRefundLedger.reduce((sum, payment) => sum + payment.amountPence, 0), 0);
+
     await updateAppointment(context.pool, business.id, first.id, { status: 'cancelled' });
     const [cancelled] = await context.db.select().from(appointments).where(eq(appointments.id, first.id));
     assert.equal(cancelled.status, 'cancelled');
@@ -172,8 +213,18 @@ test('lookbook management is tenant-scoped and public visibility follows publish
   try {
     const business = await seedBusiness(context, { slug: 'atelier-union', name: 'Atelier Union' });
     const otherBusiness = await seedBusiness(context, { slug: 'other-salon', name: 'Other Salon' });
-    const { service, artist } = await seedBookingSetup(context, business.id);
+    const { category, service, artist } = await seedBookingSetup(context, business.id);
     const otherSetup = await seedBookingSetup(context, otherBusiness.id);
+    const [addOn] = await context.db.insert(services).values({
+      businessId: business.id,
+      categoryId: category.id,
+      slug: 'editorial-finish',
+      name: 'Editorial Finish',
+      shortName: 'Editorial Finish',
+      pricePence: 800,
+      durationMinutes: 15,
+      isAddOn: true,
+    }).returning();
     const [owner] = await context.db.insert(users).values({
       email: 'owner@example.com',
       normalizedEmail: 'owner@example.com',
@@ -207,7 +258,7 @@ test('lookbook management is tenant-scoped and public visibility follows publish
       complexity: 'Low',
       description: 'A database-backed test look.',
       treatmentId: service.id,
-      addOnId: null,
+      addOnId: addOn.id,
       artistId: artist.id,
       published: true,
       active: true,
@@ -216,6 +267,10 @@ test('lookbook management is tenant-scoped and public visibility follows publish
     assert.deepEqual(adminLooks.body.looks.map((look: { name: string }) => look.name), ['QA Editorial Red']);
     const publicLooks = await request(app).get('/api/public/lookbook').expect(200);
     assert.deepEqual(publicLooks.body.looks.map((look: { id: string }) => look.id), ['qa-editorial-red']);
+
+    await context.db.update(services).set({ active: false }).where(eq(services.id, addOn.id));
+    assert.equal((await request(app).get('/api/public/lookbook').expect(200)).body.looks.length, 0);
+    await context.db.update(services).set({ active: true }).where(eq(services.id, addOn.id));
 
     await agent.patch(`/api/admin/lookbook/${created.body.look.id}`).set('x-csrf-token', csrfToken).send({ published: false }).expect(200);
     assert.equal((await request(app).get('/api/public/lookbook').expect(200)).body.looks.length, 0);

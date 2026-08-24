@@ -222,13 +222,31 @@ export async function updateAppointment(
           status: 'paid',
         });
       } else if (input.paymentStatus === 'refunded') {
-        await upsertPayment(client, {
-          businessId,
-          appointmentId,
-          amountPence: -current.total_pence,
-          kind: 'refund',
-          status: 'refunded',
-        });
+        const paidResult = await client.query<{ paid_pence: number }>(
+          `SELECT COALESCE(SUM(amount_pence), 0)::integer AS paid_pence
+             FROM payments
+            WHERE business_id=$1 AND appointment_id=$2
+              AND kind IN ('deposit','balance')
+              AND status IN ('deposit_recorded','paid')
+              AND amount_pence > 0`,
+          [businessId, appointmentId],
+        );
+        const paidPence = Number(paidResult.rows[0]?.paid_pence ?? 0);
+        if (paidPence > 0) {
+          await upsertPayment(client, {
+            businessId,
+            appointmentId,
+            amountPence: -paidPence,
+            kind: 'refund',
+            status: 'refunded',
+          });
+        } else {
+          await client.query(
+            `DELETE FROM payments
+              WHERE business_id=$1 AND appointment_id=$2 AND kind='refund'`,
+            [businessId, appointmentId],
+          );
+        }
       }
     }
 
