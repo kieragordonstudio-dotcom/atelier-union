@@ -3,12 +3,10 @@ import { Link } from 'react-router-dom';
 import { ButtonLink } from '../components/common/Button';
 import { Seo } from '../components/common/Seo';
 import { SectionHeading } from '../components/common/SectionHeading';
+import { usePublicData } from '../data/PublicDataProvider';
 import {
-  addOns,
   formatPrice,
   productRemoval,
-  treatmentCategories,
-  treatments,
   type ProductOn,
   type Treatment,
 } from '../data/treatments';
@@ -40,7 +38,7 @@ type Recommendation = {
   note?: string;
 };
 
-function getTreatment(id: string) {
+function getTreatment(id: string, treatments: Treatment[]) {
   return treatments.find((treatment) => treatment.id === id);
 }
 
@@ -54,6 +52,7 @@ function recommendationFor(
   selectedFinder: FinderQuestion | null,
   productOn: ProductOn | null,
   pedicureProduct: PedicureProduct | null,
+  treatments: Treatment[],
 ): Recommendation | null {
   if (!selectedFinder) return null;
 
@@ -61,6 +60,7 @@ function recommendationFor(
     if (!pedicureProduct) return null;
     const treatment = getTreatment(
       pedicureProduct === 'gel' ? 'gel-pedicure' : 'signature-pedicure',
+      treatments,
     );
     if (!treatment) return null;
     return {
@@ -76,10 +76,10 @@ function recommendationFor(
 
   if (selectedFinder.tag === 'colour') {
     if (productOn === 'gel') {
-      const treatment = getTreatment('gel-manicure-removal');
+      const treatment = getTreatment('gel-manicure-removal', treatments);
       return treatment ? { treatment } : null;
     }
-    const treatment = getTreatment('signature-gel');
+    const treatment = getTreatment('signature-gel', treatments);
     return treatment
       ? { treatment, product: productOn === 'none' ? undefined : productOn }
       : null;
@@ -88,8 +88,8 @@ function recommendationFor(
   if (selectedFinder.tag === 'strength') {
     const treatment =
       productOn === 'builder'
-        ? getTreatment('builder-gel-infill')
-        : getTreatment('builder-gel-new');
+        ? getTreatment('builder-gel-infill', treatments)
+        : getTreatment('builder-gel-new', treatments);
     return treatment
       ? {
           treatment,
@@ -104,8 +104,8 @@ function recommendationFor(
   if (selectedFinder.tag === 'length') {
     const treatment =
       productOn === 'extensions'
-        ? getTreatment('extension-infill')
-        : getTreatment('soft-gel-extensions');
+        ? getTreatment('extension-infill', treatments)
+        : getTreatment('soft-gel-extensions', treatments);
     return treatment
       ? {
           treatment,
@@ -117,7 +117,7 @@ function recommendationFor(
       : null;
   }
 
-  const treatment = getTreatment(selectedFinder.result);
+  const treatment = getTreatment(selectedFinder.result, treatments);
   return treatment ? { treatment } : null;
 }
 
@@ -134,6 +134,7 @@ function recommendationPrice(recommendation: Recommendation) {
 }
 
 export function TreatmentsPage() {
+  const { addOns, treatmentCategories, treatments } = usePublicData();
   const [selectedFinder, setSelectedFinder] = useState<FinderQuestion | null>(null);
   const [productOn, setProductOn] = useState<ProductOn | null>(null);
   const [pedicureProduct, setPedicureProduct] = useState<PedicureProduct | null>(
@@ -141,8 +142,8 @@ export function TreatmentsPage() {
   );
 
   const recommendation = useMemo(() => {
-    return recommendationFor(selectedFinder, productOn, pedicureProduct);
-  }, [pedicureProduct, productOn, selectedFinder]);
+    return recommendationFor(selectedFinder, productOn, pedicureProduct, treatments);
+  }, [pedicureProduct, productOn, selectedFinder, treatments]);
 
   const recommendationTotal = recommendation
     ? recommendationPrice(recommendation)

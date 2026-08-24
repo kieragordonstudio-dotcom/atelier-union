@@ -4,10 +4,9 @@ import { Seo } from '../components/common/Seo';
 import { SectionHeading } from '../components/common/SectionHeading';
 import { TrustStrip } from '../components/common/TrustStrip';
 import { siteConfig } from '../config/site';
-import { artists } from '../data/artists';
 import { lookbook } from '../data/lookbook';
+import { usePublicData } from '../data/PublicDataProvider';
 import { reviews } from '../data/reviews';
-import { treatmentCategories, treatments } from '../data/treatments';
 
 const recommendationOptions = [
   {
@@ -43,6 +42,7 @@ const process = [
 ];
 
 export function HomePage() {
+  const { artists, treatmentCategories, treatments } = usePublicData();
   const featuredTreatments = treatments.filter((treatment) => treatment.featured);
   const signatureLooks = lookbook.slice(0, 4);
 

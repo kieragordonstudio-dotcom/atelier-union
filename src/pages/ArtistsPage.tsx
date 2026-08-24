@@ -1,8 +1,9 @@
 import { ButtonLink } from '../components/common/Button';
 import { Seo } from '../components/common/Seo';
-import { artists } from '../data/artists';
+import { usePublicData } from '../data/PublicDataProvider';
 
 export function ArtistsPage() {
+  const { artists } = usePublicData();
   return (
     <>
       <Seo

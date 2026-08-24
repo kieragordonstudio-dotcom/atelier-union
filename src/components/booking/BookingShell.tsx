@@ -1,38 +1,59 @@
-import { CalendarPlus, Check, MapPin } from 'lucide-react';
+import { CalendarPlus, Check, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { siteConfig } from '../../config/site';
-import { artists, getArtistById } from '../../data/artists';
-import {
-  bookableDates,
-  nextAvailable,
-  slotsFor,
-  type AvailabilitySlot,
-  type TimeGroup,
-} from '../../data/availability';
+import type { Artist } from '../../data/artists';
 import { getLookById } from '../../data/lookbook';
+import { usePublicData } from '../../data/PublicDataProvider';
 import {
-  addOns,
   calculateBookingTotal,
   canUseAddOn,
   formatPrice,
-  getAddOnById,
-  getTreatmentById,
   productRemoval,
-  treatmentCategories,
-  treatments,
+  type AddOn,
   type AddOnId,
   type ProductOn,
   type Treatment,
   type TreatmentCategory,
 } from '../../data/treatments';
+import { ApiError, apiFetch } from '../../lib/api';
 import { Button } from '../common/Button';
 
 const steps = ['Treatment', 'Artist', 'Date & Time', 'Confirm', 'Booked'];
 const groups: TimeGroup[] = ['Morning', 'Afternoon', 'Evening'];
 const deposit = 15;
 
-type ArtistChoice = 'any' | 'maya' | 'sophie' | 'isla';
+type ArtistChoice = string;
+type TimeGroup = 'Morning' | 'Afternoon' | 'Evening';
+type AvailabilitySlot = {
+  date: string;
+  startsAt: string;
+  dayLabel: string;
+  display: string;
+  fullDisplay: string;
+  time: string;
+  group: TimeGroup;
+  artist: string;
+  artistId: string;
+  artistName: string;
+};
+type AvailabilityDay = {
+  date: string;
+  slotCount: number;
+  status: 'good' | 'limited' | 'full' | 'closed';
+  dayLabel: string;
+  display: string;
+  fullDisplay: string;
+};
+type AvailabilityResponse = {
+  timezone: string;
+  durationMinutes: number;
+  totalPence: number;
+  days: AvailabilityDay[];
+  slots: AvailabilitySlot[];
+};
+const availabilityStart = startOfToday();
+const availabilityEnd = addDays(availabilityStart, 120);
 
 type CustomerDetails = {
   fullName: string;
@@ -41,11 +62,11 @@ type CustomerDetails = {
   note: string;
 };
 
-function getInitialTreatment(params: URLSearchParams) {
+function getInitialTreatment(params: URLSearchParams, treatments: Treatment[]) {
   const look = getLookById(params.get('look'));
   return (
-    getTreatmentById(params.get('treatment')) ??
-    getTreatmentById(look?.suggestedBaseTreatment) ??
+    treatments.find((treatment) => treatment.id === params.get('treatment')) ??
+    treatments.find((treatment) => treatment.id === look?.suggestedBaseTreatment) ??
     treatments[0]
   );
 }
@@ -59,11 +80,15 @@ function getInitialProduct(params: URLSearchParams, treatment: Treatment): Produ
   return 'none';
 }
 
-function getInitialAddOns(params: URLSearchParams, treatment: Treatment) {
+function getInitialAddOns(
+  params: URLSearchParams,
+  treatment: Treatment,
+  addOns: AddOn[],
+) {
   const look = getLookById(params.get('look'));
   const ids = [params.get('addon'), look?.addOn].filter(Boolean) as AddOnId[];
   return Array.from(new Set(ids)).filter((id) => {
-    const addOn = getAddOnById(id);
+    const addOn = addOns.find((item) => item.id === id);
     return addOn ? canUseAddOn(treatment, addOn) : false;
   });
 }
@@ -73,13 +98,15 @@ function formatSlot(slot: AvailabilitySlot | null) {
 }
 
 export function BookingShell() {
+  const { addOns, artists, treatmentCategories, treatments } = usePublicData();
   const [params] = useSearchParams();
   const paramsKey = params.toString();
   const panelRef = useRef<HTMLElement>(null);
-  const initialTreatment = useMemo(() => getInitialTreatment(params), [paramsKey]);
-  const initialArtist = getArtistById(params.get('artist'))?.id as
-    | ArtistChoice
-    | undefined;
+  const initialTreatment = useMemo(
+    () => getInitialTreatment(params, treatments),
+    [paramsKey, treatments],
+  );
+  const initialArtist = artists.find((artist) => artist.id === params.get('artist'))?.id;
   const [step, setStep] = useState(0);
   const [selectedTreatment, setSelectedTreatment] =
     useState<Treatment>(initialTreatment);
@@ -87,19 +114,14 @@ export function BookingShell() {
     initialTreatment.category,
   );
   const [selectedAddOns, setSelectedAddOns] = useState<AddOnId[]>(() =>
-    getInitialAddOns(params, initialTreatment),
+    getInitialAddOns(params, initialTreatment, addOns),
   );
   const [productOn, setProductOn] = useState<ProductOn>(() =>
     getInitialProduct(params, initialTreatment),
   );
   const [artistId, setArtistId] = useState<ArtistChoice>(initialArtist ?? 'any');
-  const initialSlot = nextAvailable(initialArtist ?? 'any') ?? null;
-  const [selectedDate, setSelectedDate] = useState(
-    initialSlot?.date ?? bookableDates[0].date,
-  );
-  const [timeGroup, setTimeGroup] = useState<TimeGroup>(
-    initialSlot?.group ?? 'Afternoon',
-  );
+  const [selectedDate, setSelectedDate] = useState(toDateKey(startOfToday()));
+  const [timeGroup, setTimeGroup] = useState<TimeGroup>('Afternoon');
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(
     null,
   );
@@ -111,34 +133,34 @@ export function BookingShell() {
     note: '',
   });
   const [cancelMessage, setCancelMessage] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setSelectedAddOns((current) =>
       current.filter((id) => {
-        const addOn = getAddOnById(id);
+        const addOn = addOns.find((item) => item.id === id);
         return addOn ? canUseAddOn(selectedTreatment, addOn) : false;
       }),
     );
     if (!selectedTreatment.allowsProductRemoval) {
       setProductOn('none');
     }
-  }, [selectedTreatment]);
+  }, [addOns, selectedTreatment]);
 
   useEffect(() => {
-    const nextTreatment = getInitialTreatment(params);
-    const nextArtist = (getArtistById(params.get('artist'))?.id ??
-      'any') as ArtistChoice;
-    const nextSlot = nextAvailable(nextArtist) ?? null;
+    const nextTreatment = getInitialTreatment(params, treatments);
+    const nextArtist = artists.find((artist) => artist.id === params.get('artist'))?.id ?? 'any';
     setStep(0);
     setSelectedTreatment(nextTreatment);
     setSelectedCategory(nextTreatment.category);
-    setSelectedAddOns(getInitialAddOns(params, nextTreatment));
+    setSelectedAddOns(getInitialAddOns(params, nextTreatment, addOns));
     setProductOn(getInitialProduct(params, nextTreatment));
     setArtistId(nextArtist);
-    setSelectedDate(nextSlot?.date ?? bookableDates[0].date);
-    setTimeGroup(nextSlot?.group ?? 'Afternoon');
+    setSelectedDate(toDateKey(startOfToday()));
+    setTimeGroup('Afternoon');
     setSelectedSlot(null);
-  }, [paramsKey]);
+  }, [addOns, artists, paramsKey, treatments]);
 
   useEffect(() => {
     panelRef.current?.scrollIntoView({ block: 'start' });
@@ -150,17 +172,15 @@ export function BookingShell() {
     productOn,
   );
 
-  const selectedArtist = artistId === 'any' ? null : getArtistById(artistId);
+  const selectedArtist = artistId === 'any' ? null : artists.find((artist) => artist.id === artistId);
   const visibleTreatments = treatments.filter(
     (treatment) => treatment.category === selectedCategory,
   );
-  const availableSlots = slotsFor(selectedDate, artistId, timeGroup);
-  const nextSlot = nextAvailable(artistId) ?? null;
   const canConfirm =
     customer.fullName.trim() && customer.mobile.trim() && customer.email.trim();
 
   function toggleAddOn(id: AddOnId) {
-    const addOn = getAddOnById(id);
+    const addOn = addOns.find((item) => item.id === id);
     if (!addOn) return;
     if (!canUseAddOn(selectedTreatment, addOn)) {
       setCompatibilityMessage(
@@ -188,13 +208,6 @@ export function BookingShell() {
     setSelectedSlot(null);
   }
 
-  function chooseNextSlot(slot: AvailabilitySlot | null) {
-    if (!slot) return;
-    setSelectedDate(slot.date);
-    setTimeGroup(slot.group);
-    setSelectedSlot(slot);
-  }
-
   function goBack() {
     setStep((current) => Math.max(0, current - 1));
   }
@@ -203,9 +216,32 @@ export function BookingShell() {
     setStep((current) => Math.min(steps.length - 2, current + 1));
   }
 
-  function finishBooking() {
+  async function finishBooking() {
     if (!canConfirm || !selectedSlot) return;
-    setStep(4);
+    setBookingError('');
+    setSubmitting(true);
+    try {
+      await apiFetch('/api/public/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          serviceSlug: selectedTreatment.id,
+          addOnSlugs: selectedAddOns,
+          productOn,
+          artistSlug: selectedSlot.artist,
+          startsAt: selectedSlot.startsAt,
+          customer,
+        }),
+      });
+      setStep(4);
+    } catch (error) {
+      setBookingError(
+        error instanceof ApiError
+          ? error.message
+          : 'The appointment could not be booked. Please choose another time.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function resetBooking() {
@@ -254,6 +290,8 @@ export function BookingShell() {
 
         {step === 0 ? (
           <TreatmentStep
+            treatmentCategories={treatmentCategories}
+            addOns={addOns}
             selectedCategory={selectedCategory}
             setSelectedCategory={setSelectedCategory}
             visibleTreatments={visibleTreatments}
@@ -270,9 +308,11 @@ export function BookingShell() {
 
         {step === 1 ? (
           <ArtistStep
+            artists={artists}
             artistId={artistId}
             setArtistId={(id) => {
               setArtistId(id);
+              setSelectedDate(toDateKey(startOfToday()));
               setSelectedSlot(null);
             }}
             onBack={goBack}
@@ -282,6 +322,10 @@ export function BookingShell() {
 
         {step === 2 ? (
           <TimeStep
+            selectedTreatment={selectedTreatment}
+            selectedAddOns={selectedAddOns}
+            productOn={productOn}
+            artists={artists}
             artistId={artistId}
             selectedDate={selectedDate}
             setSelectedDate={(date) => {
@@ -295,9 +339,6 @@ export function BookingShell() {
             }}
             selectedSlot={selectedSlot}
             setSelectedSlot={setSelectedSlot}
-            availableSlots={availableSlots}
-            nextSlot={nextSlot}
-            chooseNextSlot={chooseNextSlot}
             onBack={goBack}
             onNext={goNext}
             onChangeArtist={() => setStep(1)}
@@ -316,6 +357,8 @@ export function BookingShell() {
             onBack={goBack}
             onConfirm={finishBooking}
             canConfirm={Boolean(canConfirm && selectedSlot)}
+            bookingError={bookingError}
+            submitting={submitting}
           />
         ) : null}
 
@@ -347,6 +390,8 @@ export function BookingShell() {
 }
 
 function TreatmentStep({
+  treatmentCategories,
+  addOns,
   selectedCategory,
   setSelectedCategory,
   visibleTreatments,
@@ -359,6 +404,8 @@ function TreatmentStep({
   compatibilityMessage,
   onNext,
 }: {
+  treatmentCategories: Array<{ id: string; label: string; description: string }>;
+  addOns: AddOn[];
   selectedCategory: TreatmentCategory;
   setSelectedCategory: (category: TreatmentCategory) => void;
   visibleTreatments: Treatment[];
@@ -482,11 +529,13 @@ function TreatmentStep({
 }
 
 function ArtistStep({
+  artists,
   artistId,
   setArtistId,
   onBack,
   onNext,
 }: {
+  artists: Artist[];
   artistId: ArtistChoice;
   setArtistId: (id: ArtistChoice) => void;
   onBack: () => void;
@@ -500,16 +549,15 @@ function ArtistStep({
       <div className="category-list">
         <button
           type="button"
-          className={`option-button simple-row ${artistId === 'any' ? 'is-selected' : ''}`}
+          className={`option-button simple-row artist-choice-row ${artistId === 'any' ? 'is-selected' : ''}`}
           onClick={() => setArtistId('any')}
         >
           <h3>Any Nail Artist</h3>
-          <p>Show me the earliest availability.</p>
-          <span className="price">Earliest appointments</span>
+          <p>See availability across all Nail Artists.</p>
         </button>
         {artists.map((artist) => (
           <button
-            className={`option-button simple-row ${
+            className={`option-button simple-row artist-choice-row ${
               artistId === artist.id ? 'is-selected' : ''
             }`}
             key={artist.id}
@@ -518,7 +566,6 @@ function ArtistStep({
           >
             <h3>{artist.name}</h3>
             <p>{artist.specialties.join(', ')}</p>
-            <span className="price">{artist.nextAvailable}</span>
           </button>
         ))}
       </div>
@@ -535,6 +582,10 @@ function ArtistStep({
 }
 
 function TimeStep({
+  selectedTreatment,
+  selectedAddOns,
+  productOn,
+  artists,
   artistId,
   selectedDate,
   setSelectedDate,
@@ -542,13 +593,14 @@ function TimeStep({
   setTimeGroup,
   selectedSlot,
   setSelectedSlot,
-  availableSlots,
-  nextSlot,
-  chooseNextSlot,
   onBack,
   onNext,
   onChangeArtist,
 }: {
+  selectedTreatment: Treatment;
+  selectedAddOns: AddOnId[];
+  productOn: ProductOn;
+  artists: Artist[];
   artistId: ArtistChoice;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
@@ -556,56 +608,172 @@ function TimeStep({
   setTimeGroup: (group: TimeGroup) => void;
   selectedSlot: AvailabilitySlot | null;
   setSelectedSlot: (slot: AvailabilitySlot) => void;
-  availableSlots: AvailabilitySlot[];
-  nextSlot: AvailabilitySlot | null;
-  chooseNextSlot: (slot: AvailabilitySlot | null) => void;
   onBack: () => void;
   onNext: () => void;
   onChangeArtist: () => void;
 }) {
-  const nextDateWithSlot = bookableDates.find((date) =>
-    groups.some((group) => slotsFor(date.date, artistId, group).length > 0),
+  const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
+  const [availabilityError, setAvailabilityError] = useState('');
+  const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [calendarMonth, setCalendarMonth] = useState(() =>
+    startOfMonth(dateFromKey(selectedDate)),
   );
-  const selectedDateLabel =
-    bookableDates.find((date) => date.date === selectedDate)?.fullDisplay ??
-    'this date';
+  const calendarDates = useMemo(
+    () => getCalendarDates(calendarMonth),
+    [calendarMonth],
+  );
+  const monthLabel = calendarMonth.toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const selectedDateLabel = dateFromKey(selectedDate).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const availableSlots = (availability?.slots ?? []).filter(
+    (slot) => slot.date === selectedDate && slot.group === timeGroup,
+  );
+  const nextDateWithSlot = findNextDateWithSlot(
+    selectedDate,
+    timeGroup,
+    availability?.slots ?? [],
+  );
+  const firstCalendarMonth = startOfMonth(availabilityStart);
+  const lastCalendarMonth = startOfMonth(availabilityEnd);
+  const previousMonthDisabled = calendarMonth <= firstCalendarMonth;
+  const nextMonthDisabled = calendarMonth >= lastCalendarMonth;
+
+  useEffect(() => {
+    setCalendarMonth(startOfMonth(dateFromKey(selectedDate)));
+  }, [selectedDate]);
+
+  useEffect(() => {
+    let active = true;
+    const from = toDateKey(calendarDates[0]);
+    const to = toDateKey(calendarDates[calendarDates.length - 1]);
+    const query = new URLSearchParams({
+      service: selectedTreatment.id,
+      artist: artistId,
+      addOns: selectedAddOns.join(','),
+      productOn,
+      from,
+      to,
+    });
+    setLoadingAvailability(true);
+    setAvailabilityError('');
+    apiFetch<AvailabilityResponse>(`/api/public/availability?${query.toString()}`)
+      .then((result) => {
+        if (!active) return;
+        setAvailability(result);
+        const selectedHasSlots = result.slots.some((slot) => slot.date === selectedDate);
+        if (!selectedHasSlots && selectedDate >= from && selectedDate <= to) {
+          const nextDate = result.days.find((day) => day.slotCount > 0)?.date;
+          if (nextDate) setSelectedDate(nextDate);
+        }
+      })
+      .catch((error) => {
+        if (!active) return;
+        setAvailability(null);
+        setAvailabilityError(
+          error instanceof ApiError ? error.message : 'Availability could not be loaded.',
+        );
+      })
+      .finally(() => {
+        if (active) setLoadingAvailability(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [artistId, calendarDates, productOn, selectedAddOns, selectedTreatment.id]);
+
+  function chooseDate(date: Date) {
+    setSelectedDate(toDateKey(date));
+    if (date.getMonth() !== calendarMonth.getMonth()) {
+      setCalendarMonth(startOfMonth(date));
+    }
+  }
 
   return (
     <>
       <h1 className="serif" style={{ fontSize: 'var(--step-3)' }}>
-        Choose a time.
+        Choose a date &amp; time.
       </h1>
-      {nextSlot ? (
-        <button
-          className="option-button"
-          type="button"
-          onClick={() => chooseNextSlot(nextSlot)}
-          style={{ marginBottom: 'var(--space-6)', width: '100%' }}
-        >
-          <strong>Next available</strong>
-          <br />
-          <span className="muted">
-            {nextSlot.date === '2026-08-22' ? 'Today' : nextSlot.fullDisplay} ·{' '}
-            {nextSlot.time}
-          </span>
-        </button>
-      ) : null}
-      <div className="button-row" role="tablist" aria-label="Bookable dates">
-        {bookableDates.map((date) => (
+      <section className="month-calendar" aria-label={`Availability for ${monthLabel}`}>
+        <div className="calendar-header">
           <button
-            key={date.date}
-            className={`date-button ${selectedDate === date.date ? 'is-selected' : ''}`}
+            className="calendar-nav-button"
             type="button"
-            role="tab"
-            aria-selected={selectedDate === date.date}
-            onClick={() => setSelectedDate(date.date)}
+            aria-label="Show previous month"
+            title="Previous month"
+            disabled={previousMonthDisabled}
+            onClick={() => setCalendarMonth(addMonths(calendarMonth, -1))}
           >
-            <strong>{date.dayLabel}</strong>
-            <br />
-            {date.display}
+            <ChevronLeft size={19} aria-hidden="true" />
           </button>
-        ))}
-      </div>
+          <h2 className="calendar-month-label">{monthLabel}</h2>
+          <button
+            className="calendar-nav-button"
+            type="button"
+            aria-label="Show next month"
+            title="Next month"
+            disabled={nextMonthDisabled}
+            onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+          >
+            <ChevronRight size={19} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="calendar-weekdays" aria-hidden="true">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+            <span key={day}>{day}</span>
+          ))}
+        </div>
+        <div className="calendar-grid" role="grid" aria-label={monthLabel}>
+          {calendarDates.map((date) => {
+            const dateKey = toDateKey(date);
+            const status = getAvailabilityStatus(
+              dateKey,
+              availability?.days ?? [],
+              loadingAvailability,
+            );
+            const outsideMonth = date.getMonth() !== calendarMonth.getMonth();
+            const selected = selectedDate === dateKey;
+            const fullDate = date.toLocaleDateString('en-GB', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            });
+            const ariaLabel = `${fullDate}, ${status.label.toLowerCase()}`;
+
+            return (
+              <button
+                className={`calendar-day is-${status.tone} ${
+                  outsideMonth ? 'is-outside' : ''
+                } ${selected ? 'is-selected' : ''}`}
+                type="button"
+                role="gridcell"
+                key={dateKey}
+                aria-label={ariaLabel}
+                aria-selected={selected}
+                disabled={status.disabled}
+                onClick={() => chooseDate(date)}
+              >
+                <span className="calendar-day-number">{date.getDate()}</span>
+                <span className="calendar-day-status">{status.shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+        <ul className="availability-legend" aria-label="Availability legend">
+          <li><span className="legend-dot is-good" aria-hidden="true" />Good</li>
+          <li><span className="legend-dot is-limited" aria-hidden="true" />Limited</li>
+          <li><span className="legend-dot is-full" aria-hidden="true" />Fully booked</li>
+          <li><span className="legend-dot is-closed" aria-hidden="true" />Closed / unavailable</li>
+        </ul>
+        <p className="calendar-selection" aria-live="polite">
+          Selected: <strong>{selectedDateLabel}</strong>
+        </p>
+      </section>
       <div
         className="button-row"
         role="tablist"
@@ -640,18 +808,25 @@ function TimeStep({
             {slot.time}
             <br />
             <span className="muted">
-              {getArtistById(slot.artist)?.name ?? 'Any Nail Artist'}
+              {artists.find((artist) => artist.id === slot.artist)?.name ?? slot.artistName}
             </span>
           </button>
         ))}
       </div>
-      {!availableSlots.length ? (
+      {availabilityError ? (
         <div className="info-panel" style={{ marginTop: 'var(--space-6)' }}>
-          <p>No appointments remaining on {selectedDateLabel}.</p>
+          <p role="alert">{availabilityError}</p>
+        </div>
+      ) : !loadingAvailability && !availableSlots.length ? (
+        <div className="info-panel" style={{ marginTop: 'var(--space-6)' }}>
+          <p>
+            No {timeGroup.toLowerCase()} appointments remaining on{' '}
+            {selectedDateLabel}.
+          </p>
           <div className="button-row">
             {nextDateWithSlot ? (
-              <Button tone="ghost" onClick={() => setSelectedDate(nextDateWithSlot.date)}>
-                See {nextDateWithSlot.fullDisplay.split(' ')[0]}
+              <Button tone="ghost" onClick={() => setSelectedDate(nextDateWithSlot)}>
+                See {dateFromKey(nextDateWithSlot).toLocaleDateString('en-GB', { weekday: 'long' })}
               </Button>
             ) : null}
             <Button tone="ghost" onClick={onChangeArtist}>
@@ -672,6 +847,97 @@ function TimeStep({
   );
 }
 
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 12);
+}
+
+function startOfToday() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+function dateFromKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1, 12);
+}
+
+function getCalendarDates(month: Date) {
+  const firstDay = startOfMonth(month);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(firstDay.getDate() - mondayOffset);
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
+  });
+}
+
+function getAvailabilityStatus(
+  date: string,
+  days: AvailabilityDay[],
+  loading: boolean,
+) {
+  const firstDate = toDateKey(availabilityStart);
+  const lastDate = toDateKey(availabilityEnd);
+
+  if (date < firstDate || date > lastDate) {
+    return { tone: 'closed', label: 'Unavailable', shortLabel: 'Closed', disabled: true };
+  }
+  if (loading) {
+    return { tone: 'closed', label: 'Checking availability', shortLabel: '...', disabled: true };
+  }
+  const day = days.find((item) => item.date === date);
+  if (!day || day.status === 'closed') {
+    return { tone: 'closed', label: 'Closed', shortLabel: 'Closed', disabled: true };
+  }
+  if (day.status === 'good') {
+    return {
+      tone: 'good',
+      label: `Good availability, ${day.slotCount} slots`,
+      shortLabel: 'Good',
+      disabled: false,
+    };
+  }
+  if (day.status === 'limited') {
+    return {
+      tone: 'limited',
+      label: `Limited availability, ${day.slotCount} ${day.slotCount === 1 ? 'slot' : 'slots'}`,
+      shortLabel: 'Limited',
+      disabled: false,
+    };
+  }
+  return { tone: 'full', label: 'Fully booked', shortLabel: 'Full', disabled: true };
+}
+
+function findNextDateWithSlot(
+  selectedDate: string,
+  timeGroup: TimeGroup,
+  slots: AvailabilitySlot[],
+) {
+  return (
+    slots.find((slot) => slot.date > selectedDate && slot.group === timeGroup)?.date ??
+    null
+  );
+}
+
 function ConfirmStep({
   selectedTreatment,
   total,
@@ -683,10 +949,12 @@ function ConfirmStep({
   onBack,
   onConfirm,
   canConfirm,
+  bookingError,
+  submitting,
 }: {
   selectedTreatment: Treatment;
   total: ReturnType<typeof calculateBookingTotal>;
-  selectedArtist: ReturnType<typeof getArtistById> | null;
+  selectedArtist: Artist | null | undefined;
   artistId: ArtistChoice;
   selectedSlot: AvailabilitySlot | null;
   customer: CustomerDetails;
@@ -694,6 +962,8 @@ function ConfirmStep({
   onBack: () => void;
   onConfirm: () => void;
   canConfirm: boolean;
+  bookingError: string;
+  submitting: boolean;
 }) {
   const dueAtStudio = Math.max(total.price - deposit, 0);
   return (
@@ -790,10 +1060,15 @@ function ConfirmStep({
         <Button tone="ghost" onClick={onBack}>
           Back
         </Button>
-        <Button tone="accent" onClick={onConfirm} disabled={!canConfirm}>
+        <Button tone="accent" onClick={onConfirm} disabled={!canConfirm || submitting}>
           Confirm appointment
         </Button>
       </div>
+      {bookingError ? (
+        <p className="muted" role="alert" style={{ marginTop: 'var(--space-4)' }}>
+          {bookingError}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -811,7 +1086,7 @@ function BookingComplete({
 }: {
   selectedTreatment: Treatment;
   total: ReturnType<typeof calculateBookingTotal>;
-  selectedArtist: ReturnType<typeof getArtistById> | null;
+  selectedArtist: Artist | null | undefined;
   artistId: ArtistChoice;
   selectedSlot: AvailabilitySlot | null;
   onAddCalendar: () => void;
@@ -906,7 +1181,7 @@ function BookingSummary({
   treatment: Treatment;
   total: ReturnType<typeof calculateBookingTotal>;
   productOn: ProductOn;
-  artist: ReturnType<typeof getArtistById> | null;
+  artist: Artist | null | undefined;
   artistId: ArtistChoice;
   slot: AvailabilitySlot | null;
 }) {

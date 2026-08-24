@@ -10,187 +10,136 @@ export type AvailabilitySlot = {
   artist: 'maya' | 'sophie' | 'isla';
 };
 
-export const availability: AvailabilitySlot[] = [
-  {
-    date: '2026-08-22',
-    dayLabel: 'SAT',
-    display: '22 AUG',
-    fullDisplay: 'Saturday 22 August',
-    time: '16:15',
-    group: 'Afternoon',
-    artist: 'maya',
-  },
-  {
-    date: '2026-08-24',
-    dayLabel: 'MON',
-    display: '24 AUG',
-    fullDisplay: 'Monday 24 August',
-    time: '09:30',
-    group: 'Morning',
-    artist: 'sophie',
-  },
-  {
-    date: '2026-08-24',
-    dayLabel: 'MON',
-    display: '24 AUG',
-    fullDisplay: 'Monday 24 August',
-    time: '12:45',
-    group: 'Afternoon',
-    artist: 'sophie',
-  },
-  {
-    date: '2026-08-24',
-    dayLabel: 'MON',
-    display: '24 AUG',
-    fullDisplay: 'Monday 24 August',
-    time: '17:15',
-    group: 'Evening',
-    artist: 'maya',
-  },
-  {
-    date: '2026-08-25',
-    dayLabel: 'TUE',
-    display: '25 AUG',
-    fullDisplay: 'Tuesday 25 August',
-    time: '10:45',
-    group: 'Morning',
-    artist: 'isla',
-  },
-  {
-    date: '2026-08-25',
-    dayLabel: 'TUE',
-    display: '25 AUG',
-    fullDisplay: 'Tuesday 25 August',
-    time: '15:30',
-    group: 'Afternoon',
-    artist: 'isla',
-  },
-  {
-    date: '2026-08-25',
-    dayLabel: 'TUE',
-    display: '25 AUG',
-    fullDisplay: 'Tuesday 25 August',
-    time: '18:00',
-    group: 'Evening',
-    artist: 'sophie',
-  },
-  {
-    date: '2026-08-27',
-    dayLabel: 'THU',
-    display: '27 AUG',
-    fullDisplay: 'Thursday 27 August',
-    time: '09:30',
-    group: 'Morning',
-    artist: 'maya',
-  },
-  {
-    date: '2026-08-27',
-    dayLabel: 'THU',
-    display: '27 AUG',
-    fullDisplay: 'Thursday 27 August',
-    time: '13:15',
-    group: 'Afternoon',
-    artist: 'sophie',
-  },
-  {
-    date: '2026-08-27',
-    dayLabel: 'THU',
-    display: '27 AUG',
-    fullDisplay: 'Thursday 27 August',
-    time: '18:30',
-    group: 'Evening',
-    artist: 'isla',
-  },
-  {
-    date: '2026-08-28',
-    dayLabel: 'FRI',
-    display: '28 AUG',
-    fullDisplay: 'Friday 28 August',
-    time: '10:15',
-    group: 'Morning',
-    artist: 'maya',
-  },
-  {
-    date: '2026-08-28',
-    dayLabel: 'FRI',
-    display: '28 AUG',
-    fullDisplay: 'Friday 28 August',
-    time: '14:30',
-    group: 'Afternoon',
-    artist: 'sophie',
-  },
-  {
-    date: '2026-08-29',
-    dayLabel: 'SAT',
-    display: '29 AUG',
-    fullDisplay: 'Saturday 29 August',
-    time: '11:00',
-    group: 'Morning',
-    artist: 'isla',
-  },
-  {
-    date: '2026-08-29',
-    dayLabel: 'SAT',
-    display: '29 AUG',
-    fullDisplay: 'Saturday 29 August',
-    time: '14:30',
-    group: 'Afternoon',
-    artist: 'maya',
-  },
-];
+type ArtistId = AvailabilitySlot['artist'];
 
-export const bookableDates = [
-  {
-    date: '2026-08-22',
-    dayLabel: 'SAT',
-    display: '22 AUG',
-    fullDisplay: 'Saturday 22 August',
-  },
-  {
-    date: '2026-08-24',
-    dayLabel: 'MON',
-    display: '24 AUG',
-    fullDisplay: 'Monday 24 August',
-  },
-  {
-    date: '2026-08-25',
-    dayLabel: 'TUE',
-    display: '25 AUG',
-    fullDisplay: 'Tuesday 25 August',
-  },
-  {
-    date: '2026-08-26',
-    dayLabel: 'WED',
-    display: '26 AUG',
-    fullDisplay: 'Wednesday 26 August',
-  },
-  {
-    date: '2026-08-27',
-    dayLabel: 'THU',
-    display: '27 AUG',
-    fullDisplay: 'Thursday 27 August',
-  },
-  {
-    date: '2026-08-28',
-    dayLabel: 'FRI',
-    display: '28 AUG',
-    fullDisplay: 'Friday 28 August',
-  },
-  {
-    date: '2026-08-29',
-    dayLabel: 'SAT',
-    display: '29 AUG',
-    fullDisplay: 'Saturday 29 August',
-  },
-];
+const artistIds: ArtistId[] = ['maya', 'sophie', 'isla'];
+const workingDays: Record<ArtistId, number[]> = {
+  maya: [1, 2, 4, 5, 6],
+  sophie: [1, 3, 4, 5, 6],
+  isla: [2, 3, 4, 5, 6],
+};
+const artistTimes: Record<ArtistId, string[]> = {
+  maya: ['09:30', '12:15', '15:30', '17:15'],
+  sophie: ['10:00', '13:15', '16:15', '18:30'],
+  isla: ['10:30', '14:00', '16:45', '19:00'],
+};
 
-export function slotsFor(date: string, artistId: string, group: TimeGroup) {
-  return availability.filter((slot) => {
-    const artistMatches = artistId === 'any' || slot.artist === artistId;
-    return slot.date === date && artistMatches && slot.group === group;
-  });
+const dayFormatter = new Intl.DateTimeFormat('en-GB', { weekday: 'short' });
+const shortFormatter = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+});
+const fullFormatter = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+
+function startOfToday() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
 }
 
-export function nextAvailable(artistId: string) {
-  return availability.find((slot) => artistId === 'any' || slot.artist === artistId);
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+export function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function dateFromKey(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+function groupForTime(time: string): TimeGroup {
+  const hour = Number(time.split(':')[0]);
+  if (hour < 12) return 'Morning';
+  if (hour < 17) return 'Afternoon';
+  return 'Evening';
+}
+
+function slotCountFor(date: Date, artistIndex: number) {
+  const pattern = [3, 2, 4, 1, 0];
+  const seed = date.getDate() + date.getMonth() * 3 + artistIndex * 2;
+  return pattern[seed % pattern.length];
+}
+
+export const availabilityStart = startOfToday();
+
+function buildAvailability() {
+  const slots: AvailabilitySlot[] = [];
+
+  for (let offset = 0; offset < 124; offset += 1) {
+    const date = addDays(availabilityStart, offset);
+    const day = date.getDay();
+    const dateKey = toDateKey(date);
+
+    artistIds.forEach((artist, artistIndex) => {
+      if (!workingDays[artist].includes(day)) return;
+
+      const count = slotCountFor(date, artistIndex);
+      artistTimes[artist].slice(0, count).forEach((time) => {
+        slots.push({
+          date: dateKey,
+          dayLabel: dayFormatter.format(date).toUpperCase(),
+          display: shortFormatter.format(date).toUpperCase(),
+          fullDisplay: fullFormatter.format(date),
+          time,
+          group: groupForTime(time),
+          artist,
+        });
+      });
+    });
+  }
+
+  return slots;
+}
+
+export const availabilityEnd = addDays(availabilityStart, 123);
+export const availability: AvailabilitySlot[] = buildAvailability();
+
+export const bookableDates = Array.from(
+  new Map(
+    availability.map((slot) => [
+      slot.date,
+      {
+        date: slot.date,
+        dayLabel: slot.dayLabel,
+        display: slot.display,
+        fullDisplay: slot.fullDisplay,
+      },
+    ]),
+  ).values(),
+);
+
+export function isWorkingDate(date: string, artistId: string) {
+  const day = dateFromKey(date).getDay();
+  if (day === 0) return false;
+  if (artistId === 'any') return true;
+  return workingDays[artistId as ArtistId]?.includes(day) ?? false;
+}
+
+export function slotsForDate(date: string, artistId: string) {
+  return availability.filter(
+    (slot) =>
+      slot.date === date && (artistId === 'any' || slot.artist === artistId),
+  );
+}
+
+export function slotsFor(date: string, artistId: string, group: TimeGroup) {
+  return slotsForDate(date, artistId).filter((slot) => slot.group === group);
+}
+
+export function nextAvailable(artistId: string, fromDate = toDateKey(availabilityStart)) {
+  return availability.find(
+    (slot) =>
+      slot.date >= fromDate && (artistId === 'any' || slot.artist === artistId),
+  );
 }

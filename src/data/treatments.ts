@@ -1,16 +1,6 @@
-export type TreatmentCategory =
-  | 'manicures'
-  | 'builder'
-  | 'extensions'
-  | 'pedicures'
-  | 'removal'
-  | 'addons';
+export type TreatmentCategory = string;
 
-export type AddOnId =
-  | 'micro-french'
-  | 'chrome'
-  | 'minimal-art'
-  | 'detailed-art';
+export type AddOnId = string;
 
 export type ProductOn = 'none' | 'gel' | 'builder' | 'extensions';
 

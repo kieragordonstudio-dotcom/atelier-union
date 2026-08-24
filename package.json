@@ -7,21 +7,50 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
+    "build": "tsc -b && vite build && tsc -p tsconfig.server.json",
+    "start": "node server-dist/server/index.js",
     "preview": "vite preview",
-    "check": "tsc -b --noEmit"
+    "check": "tsc -b --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "tsx --test tests/**/*.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx server/scripts/migrate.ts",
+    "db:seed": "tsx server/scripts/seed.ts"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
+    "connect-pg-simple": "^10.0.0",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
     "lucide-react": "^0.468.0",
+    "luxon": "^3.7.2",
+    "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.1"
+    "react-router-dom": "^6.30.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "@types/connect-pg-simple": "^7.0.3",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/luxon": "^3.7.5",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
+    "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^10.0.5",
+    "drizzle-kit": "^0.31.10",
+    "pg-mem": "^3.0.14",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3",
     "vite": "^7.2.7"
   }

@@ -857,6 +857,185 @@ h3 {
   margin-bottom: var(--space-6);
 }
 
+.artist-choice-row {
+  grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.35fr);
+}
+
+.month-calendar {
+  margin-top: var(--space-5);
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.calendar-month-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 400;
+  text-align: center;
+}
+
+.calendar-nav-button {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(24, 21, 18, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 253, 249, 0.38);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.calendar-nav-button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.calendar-nav-button:disabled {
+  color: rgba(24, 21, 18, 0.3);
+  cursor: default;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar-weekdays {
+  margin-bottom: var(--space-2);
+}
+
+.calendar-weekdays span {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.22rem;
+  border: 1px solid rgba(24, 21, 18, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 253, 249, 0.34);
+  color: var(--color-text);
+  padding: 0.35rem 0.15rem;
+  cursor: pointer;
+}
+
+.calendar-day:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+.calendar-day.is-good {
+  color: #445448;
+  background: rgba(73, 82, 72, 0.1);
+}
+
+.calendar-day.is-limited {
+  color: #7d5c31;
+  background: rgba(157, 119, 66, 0.11);
+}
+
+.calendar-day.is-full {
+  color: #7a3f47;
+  background: rgba(104, 29, 39, 0.08);
+}
+
+.calendar-day.is-closed {
+  color: #77716b;
+  background: rgba(111, 105, 99, 0.07);
+}
+
+.calendar-day.is-selected {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  background: rgba(104, 29, 39, 0.12);
+  color: var(--color-accent);
+}
+
+.calendar-day.is-outside {
+  opacity: 0.48;
+}
+
+.calendar-day:disabled {
+  cursor: default;
+}
+
+.calendar-day-number {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.calendar-day-status {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.availability-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  list-style: none;
+}
+
+.availability-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.legend-dot {
+  width: 0.58rem;
+  height: 0.58rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #77716b;
+}
+
+.legend-dot.is-good {
+  background: #536457;
+}
+
+.legend-dot.is-limited {
+  background: #9d7742;
+}
+
+.legend-dot.is-full {
+  background: #874851;
+}
+
+.calendar-selection {
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
 .step-pill {
   border: 1px solid rgba(24, 21, 18, 0.15);
   border-radius: var(--radius-xs);
@@ -1233,6 +1412,32 @@ h3 {
     margin-inline: -4px;
   }
 
+  .artist-choice-row {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-grid,
+  .calendar-weekdays {
+    gap: 2px;
+  }
+
+  .calendar-day {
+    min-height: 56px;
+  }
+
+  .calendar-weekdays span {
+    font-size: 0.68rem;
+  }
+
+  .calendar-day-status {
+    font-size: 0.66rem;
+  }
+
+  .availability-legend {
+    gap: var(--space-2) var(--space-3);
+    font-size: 0.72rem;
+  }
+
   .button,
   .button-link {
     width: 100%;
@@ -1241,6 +1446,16 @@ h3 {
   .header-actions .mobile-book {
     display: inline-flex;
     width: auto;
+  }
+}
+
+@media (max-width: 390px) {
+  .month-calendar {
+    margin-inline: -12px;
+  }
+
+  .calendar-day {
+    min-height: 54px;
   }
 }
 

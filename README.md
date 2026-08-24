@@ -1,51 +1,57 @@
 # Atelier Union
 
-A polished concept website for a fictional premium nail salon on Union Street, Aberdeen. It is built with React, Vite, TypeScript, React Router and static CSS.
+Atelier Union is a React, Vite and TypeScript salon website with the private KGD salon-management workspace at `/KGD`. One Express process serves the built frontend, same-origin APIs and PostgreSQL-backed booking system.
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/kieragordonstudio-dotcom/atelier-union)
+## Requirements
 
-## Run locally
+- Node.js 20.19 or newer
+- pnpm 10
+- PostgreSQL 14 or newer
+
+Copy `.env.example` to `.env` and provide all required values. Never commit that file.
+
+## Local development
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run db:migrate
+pnpm run db:seed
+pnpm run dev
 ```
 
-## Build
+Vite serves the frontend and proxies `/api` to the Express development server on port `3001`.
+
+## Verification
 
 ```bash
-npm run build
+pnpm run check
+pnpm run test
+pnpm run build
+pnpm run start
 ```
 
-The production files are generated in `dist/`.
+`db:seed` bootstraps Atelier Union from the existing repository data and creates the configured owner only when missing. It does not create clients, appointments, revenue or analytics, and repeated runs do not overwrite owner-managed salon data.
 
-## Deploy to Render
+## Architecture
 
-This repo includes `render.yaml` for a Render Static Site:
+- `src/`: finished customer website and booking UI
+- `src/kgd/`: isolated KGD owner application
+- `server/routes/`: `/api/public`, `/api/auth` and authenticated `/api/admin` routes
+- `server/services/`: availability, booking, conflict and administration logic
+- `server/db/schema.ts`: tenant-aware Drizzle schema
+- `migrations/`: PostgreSQL migrations, including database-level appointment overlap protection
+- `tests/`: authentication, tenant, availability and booking integration tests
 
-- Build command: `npm ci && npm run build`
-- Publish directory: `dist`
-- SPA rewrite: `/*` to `/index.html`
+## Render deployment
 
-In Render, create a new Static Site from the repository or sync the Blueprint. The rewrite is required so React Router routes such as `/treatments`, `/lookbook` and `/book` work when loaded directly.
+`render.yaml` defines:
 
-## Edit the template
+- Node web service: `atelier-union`
+- PostgreSQL database: `atelier-union-db`
+- Build: `corepack enable && pnpm install --frozen-lockfile && pnpm run build`
+- Start: `pnpm run db:migrate && pnpm run db:seed && pnpm run start`
+- Health check: `/api/health`
 
-- Salon name, contact details, policies and footer copy: `src/config/site.ts`
-- Brand colours, spacing, radius and typography tokens: `src/styles/tokens.css`
-- TypeScript theme reference: `src/config/theme.ts`
-- Treatments and prices: `src/data/treatments.ts`
-- Artists: `src/data/artists.ts`
-- Reviews: `src/data/reviews.ts`
-- Lookbook items: `src/data/lookbook.ts`
-- Booking availability: `src/data/availability.ts`
-- Images: `public/images/` and `src/data/lookbook.ts`
+The Blueprint wires `DATABASE_URL` and generates `SESSION_SECRET`. Enter `KGD_ADMIN_EMAIL` and a strong `KGD_ADMIN_PASSWORD` when Render prompts for the unsynced values. The first start migrates and seeds the database; later starts preserve all owner changes.
 
-## Duplicate for a new salon
-
-1. Copy the project folder.
-2. Update `src/config/site.ts`.
-3. Update the colour tokens in `src/styles/tokens.css`.
-4. Replace images in `public/images/` and update `IMAGE-SOURCES.md`.
-5. Edit treatments, artists, reviews, lookbook and availability data.
-6. Run `npm run build` before deployment.
+The public routes remain unlinked from `/KGD`. Admin pages send `noindex, nofollow`, use server-side sessions, and are never wrapped in the public header or footer.

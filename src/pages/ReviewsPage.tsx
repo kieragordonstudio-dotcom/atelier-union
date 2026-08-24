@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Seo } from '../components/common/Seo';
+import { usePublicData } from '../data/PublicDataProvider';
 import { reviews } from '../data/reviews';
-import { treatments } from '../data/treatments';
 
 const ratingOptions = ['1', '2', '3', '4', '5'];
 
@@ -13,6 +13,7 @@ type ReviewForm = {
 };
 
 export function ReviewsPage() {
+  const { treatments } = usePublicData();
   const [form, setForm] = useState<ReviewForm>({
     name: '',
     treatment: '',
