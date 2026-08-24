@@ -1,7 +1,6 @@
 import { CalendarPlus, Check, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { siteConfig } from '../../config/site';
 import type { Artist } from '../../data/artists';
 import { getLookById } from '../../data/lookbook';
 import { usePublicData } from '../../data/PublicDataProvider';
@@ -391,6 +390,7 @@ export function BookingShell() {
       <BookingSummary
         treatment={selectedTreatment}
         total={total}
+        deposit={deposit}
         productOn={productOn}
         artist={selectedArtist}
         artistId={artistId}
@@ -1202,6 +1202,7 @@ function BookingComplete({
 function BookingSummary({
   treatment,
   total,
+  deposit,
   productOn,
   artist,
   artistId,
@@ -1209,6 +1210,7 @@ function BookingSummary({
 }: {
   treatment: Treatment;
   total: ReturnType<typeof calculateBookingTotal>;
+  deposit: number;
   productOn: ProductOn;
   artist: Artist | null | undefined;
   artistId: ArtistChoice;
@@ -1252,7 +1254,9 @@ function BookingSummary({
         <span>Total</span>
         <strong>{formatPrice(total.price)}</strong>
       </div>
-      <p className="muted">{siteConfig.bookingPolicy}</p>
+      <p className="muted">
+        A {formatBookingPrice(deposit)} demo deposit is shown during booking and deducted from the final bill. No real payment is taken on this concept site.
+      </p>
     </aside>
   );
 }
