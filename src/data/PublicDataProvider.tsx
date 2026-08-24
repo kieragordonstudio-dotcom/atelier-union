@@ -39,16 +39,16 @@ export type PublicWebsite = {
 type CatalogResponse = Omit<PublicData, 'ready' | 'lookbook' | 'website'> & {
   artists: Array<Omit<Artist, 'nextAvailable'> & { nextAvailable?: string }>;
   website?: {
-    salon_name: string;
+    salonName: string;
     email: string | null;
     phone: string | null;
-    address_line_1: string;
+    addressLine1: string;
     city: string;
     postcode: string;
     country: string;
-    instagram_url: string | null;
-    email_url: string | null;
-    opening_hours: Array<{ days: string; hours: string }>;
+    instagramUrl: string | null;
+    emailUrl: string | null;
+    openingHours: Array<{ days: string; hours: string }>;
   } | null;
 };
 
@@ -109,16 +109,16 @@ export function PublicDataProvider({ children }: { children: React.ReactNode }) 
     if (!catalog) return fallback;
     const website = catalog.website
       ? {
-          salonName: catalog.website.salon_name,
+          salonName: catalog.website.salonName,
           email: catalog.website.email ?? '',
           phone: catalog.website.phone ?? '',
-          addressLine1: catalog.website.address_line_1,
+          addressLine1: catalog.website.addressLine1,
           city: catalog.website.city,
           postcode: catalog.website.postcode,
           country: catalog.website.country,
-          instagramUrl: catalog.website.instagram_url ?? '',
-          emailUrl: catalog.website.email_url ?? '',
-          openingHours: catalog.website.opening_hours,
+          instagramUrl: catalog.website.instagramUrl ?? '',
+          emailUrl: catalog.website.emailUrl ?? '',
+          openingHours: catalog.website.openingHours,
           contactLabel:
             catalog.website.email === siteConfig.email && !catalog.website.phone
               ? siteConfig.contactPlaceholder
