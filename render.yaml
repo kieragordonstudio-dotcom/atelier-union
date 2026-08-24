@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    buildCommand: pnpm install --frozen-lockfile && pnpm run build
     startCommand: pnpm run db:migrate && pnpm run db:seed && pnpm run start
     healthCheckPath: /api/health
     envVars:

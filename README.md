@@ -48,7 +48,7 @@ pnpm run start
 
 - Node web service: `atelier-union`
 - PostgreSQL database: `atelier-union-db`
-- Build: `corepack enable && pnpm install --frozen-lockfile && pnpm run build`
+- Build: `pnpm install --frozen-lockfile && pnpm run build`
 - Start: `pnpm run db:migrate && pnpm run db:seed && pnpm run start`
 - Health check: `/api/health`
 
