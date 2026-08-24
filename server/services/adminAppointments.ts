@@ -129,7 +129,7 @@ export async function updateAppointment(
               status = $6,
               payment_status = $7,
               internal_notes = COALESCE($8, internal_notes),
-              cancelled_at = CASE WHEN $6 = 'cancelled' THEN now() ELSE NULL END,
+              cancelled_at = $9,
               updated_at = now()
         WHERE id = $1 AND business_id = $2`,
       [
@@ -141,6 +141,7 @@ export async function updateAppointment(
         nextStatus,
         paymentStatus,
         input.internalNotes ?? null,
+        nextStatus === 'cancelled' ? new Date() : null,
       ],
     );
 
