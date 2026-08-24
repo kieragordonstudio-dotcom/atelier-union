@@ -3,15 +3,16 @@ import { and, eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../db/database.js';
-import { businessMemberships, users } from '../db/schema.js';
+import { businesses, businessMemberships, users } from '../db/schema.js';
 import { AppError } from '../errors.js';
 import { ensureCsrfToken } from '../middleware/csrf.js';
 import { recordAudit } from '../services/audit.js';
 
 const loginSchema = z.object({
-  email: z.string().trim().email().max(320),
+  identifier: z.string().trim().min(1).max(320).optional(),
+  email: z.string().trim().email().max(320).optional(),
   password: z.string().min(1).max(256),
-});
+}).refine((input) => Boolean(input.identifier || input.email), 'Username or email is required.');
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(256),
   newPassword: z.string().min(12).max(256),
@@ -29,6 +30,19 @@ export function authRoutes(db: Database) {
   router.get('/session', async (request, response, next) => {
     try {
       const csrfToken = ensureCsrfToken(request);
+      if (request.session.isGuest && request.session.role === 'guest' && request.session.businessId) {
+        response.json({
+          authenticated: true,
+          csrfToken,
+          user: {
+            id: 'guest',
+            email: 'guest',
+            role: 'guest',
+            businessId: request.session.businessId,
+          },
+        });
+        return;
+      }
       if (!request.session.userId || !request.session.businessId) {
         response.json({ authenticated: false, csrfToken });
         return;
@@ -65,7 +79,30 @@ export function authRoutes(db: Database) {
   router.post('/login', async (request, response, next) => {
     try {
       const input = loginSchema.parse(request.body);
-      const normalizedEmail = input.email.toLowerCase();
+      const identifier = (input.identifier ?? input.email ?? '').toLowerCase();
+      if (identifier === 'guest' && input.password === 'guest') {
+        const [business] = await db
+          .select({ id: businesses.id })
+          .from(businesses)
+          .where(eq(businesses.slug, 'atelier-union'))
+          .limit(1);
+        if (!business) {
+          throw new AppError(401, 'LOGIN_REJECTED', 'Username/email or password is incorrect.');
+        }
+        await regenerateSession(request);
+        request.session.businessId = business.id;
+        request.session.role = 'guest';
+        request.session.isGuest = true;
+        const csrfToken = ensureCsrfToken(request);
+        response.json({
+          authenticated: true,
+          csrfToken,
+          user: { id: 'guest', email: 'guest', role: 'guest', businessId: business.id },
+        });
+        return;
+      }
+
+      const normalizedEmail = identifier;
       const rows = await db
         .select({
           user: users,
@@ -81,13 +118,14 @@ export function authRoutes(db: Database) {
       const match = rows[0];
       const valid = match ? await compare(input.password, match.user.passwordHash) : false;
       if (!match || !valid) {
-        throw new AppError(401, 'LOGIN_REJECTED', 'Email or password is incorrect.');
+        throw new AppError(401, 'LOGIN_REJECTED', 'Username/email or password is incorrect.');
       }
 
       await regenerateSession(request);
       request.session.userId = match.user.id;
       request.session.businessId = match.businessId;
       request.session.role = match.role;
+      request.session.isGuest = false;
       const csrfToken = ensureCsrfToken(request);
       await db
         .update(users)

@@ -13,7 +13,7 @@ export class ApiError extends Error {
 type SessionResponse = {
   authenticated: boolean;
   csrfToken: string;
-  user?: { id: string; email: string; role: 'owner' | 'admin'; businessId: string };
+  user?: { id: string; email: string; role: 'owner' | 'admin' | 'guest'; businessId: string };
 };
 
 export async function getSession() {

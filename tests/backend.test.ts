@@ -74,7 +74,7 @@ test('authentication rejects bad credentials and admin authorization enforces th
     assert.equal(rejected.status, 401);
     assert.equal(rejected.body.error.code, 'LOGIN_REJECTED');
 
-    const login = await agent.post('/api/auth/login').set('x-csrf-token', csrfToken).send({ email: 'owner@example.com', password: 'correct-password-123' }).expect(200);
+    const login = await agent.post('/api/auth/login').set('x-csrf-token', csrfToken).send({ identifier: 'owner@example.com', password: 'correct-password-123' }).expect(200);
     const authenticatedCsrfToken = login.body.csrfToken as string;
     assert.notEqual(authenticatedCsrfToken, csrfToken);
     const startsAt = DateTime.now().setZone('Europe/London').plus({ days: 2 }).startOf('hour');
@@ -92,6 +92,21 @@ test('authentication rejects bad credentials and admin authorization enforces th
     await agent.delete(`/api/admin/time-off/${createdBlock.body.timeOff.id}`).set('x-csrf-token', authenticatedCsrfToken).expect(204);
     await agent.post('/api/auth/logout').set('x-csrf-token', authenticatedCsrfToken).expect(204);
     await agent.get('/api/admin/clients').expect(401);
+
+    const guestAgent = request.agent(app);
+    const guestSession = await guestAgent.get('/api/auth/session').expect(200);
+    const guestLogin = await guestAgent.post('/api/auth/login')
+      .set('x-csrf-token', guestSession.body.csrfToken)
+      .send({ identifier: 'guest', password: 'guest' })
+      .expect(200);
+    assert.equal(guestLogin.body.user.role, 'guest');
+    assert.equal((await guestAgent.get('/api/auth/session').expect(200)).body.user.role, 'guest');
+    await guestAgent.get('/api/admin/services').expect(200);
+    await guestAgent.get('/api/admin/clients').expect(403);
+    await guestAgent.patch('/api/admin/website')
+      .set('x-csrf-token', guestLogin.body.csrfToken)
+      .send({ salonName: 'Blocked guest edit' })
+      .expect(403);
   } finally {
     await context.pool.end();
   }

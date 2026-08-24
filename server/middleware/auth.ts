@@ -6,7 +6,7 @@ import { businessMemberships, users } from '../db/schema.js';
 export type AdminAuth = {
   userId: string;
   businessId: string;
-  role: 'owner' | 'admin';
+  role: 'owner' | 'admin' | 'guest';
   email: string;
 };
 
@@ -15,6 +15,16 @@ export type AdminRequest = Request & { adminAuth: AdminAuth };
 export function requireAdmin(db: Database) {
   return async (request: Request, response: Response, next: NextFunction) => {
     try {
+      if (request.session.isGuest && request.session.role === 'guest' && request.session.businessId) {
+        (request as AdminRequest).adminAuth = {
+          userId: 'guest',
+          businessId: request.session.businessId,
+          role: 'guest',
+          email: 'guest',
+        };
+        next();
+        return;
+      }
       if (!request.session.userId || !request.session.businessId) {
         response.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Sign in required.' } });
         return;

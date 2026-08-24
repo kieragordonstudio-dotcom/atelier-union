@@ -26,7 +26,7 @@ import { TeamPage } from './pages/TeamPage';
 import { WebsitePage } from './pages/WebsitePage';
 import './kgd.css';
 
-export type KgdUser = { id: string; email: string; role: 'owner' | 'admin'; businessId: string };
+export type KgdUser = { id: string; email: string; role: 'owner' | 'admin' | 'guest'; businessId: string };
 
 const navigation = [
   { to: '/KGD', label: 'Dashboard', icon: Gauge, end: true },
@@ -41,8 +41,12 @@ const navigation = [
   { to: '/KGD/settings', label: 'Settings', icon: Settings },
 ];
 
+const guestNavigation = navigation.filter(({ label }) =>
+  ['Services', 'Team', 'Lookbook', 'Website', 'Analytics'].includes(label),
+);
+
 function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +58,7 @@ function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
     try {
       const result = await apiFetch<{ user: KgdUser }>('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
       onLogin(result.user);
     } catch (requestError) {
@@ -71,11 +75,11 @@ function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
       <section className="kgd-login-panel">
         <p className="kgd-mark">KGD</p>
         <p className="kgd-eyebrow">ATELIER UNION OPERATIONS</p>
-        <h1>Owner sign in</h1>
+        <h1>Sign in</h1>
         <form className="kgd-form" onSubmit={submit}>
           <label>
-            <span>Email</span>
-            <input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <span>Username or email</span>
+            <input autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
           </label>
           <label>
             <span>Password</span>
@@ -94,10 +98,12 @@ function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
 function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const guest = user.role === 'guest';
+  const visibleNavigation = guest ? guestNavigation : navigation;
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   return (
-    <div className="kgd kgd-shell">
+    <div className={`kgd kgd-shell ${guest ? 'is-guest' : ''}`}>
       <header className="kgd-mobile-header">
         <span className="kgd-mark">KGD</span>
         <button className="kgd-icon-button" type="button" onClick={() => setMenuOpen((open) => !open)} title="Navigation">
@@ -110,7 +116,7 @@ function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) 
           <span>ATELIER UNION</span>
         </div>
         <nav aria-label="KGD navigation">
-          {navigation.map(({ to, label, icon: Icon, end }) => (
+          {visibleNavigation.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}>
               <Icon size={17} aria-hidden="true" />
               {label}
@@ -123,19 +129,22 @@ function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) 
         </div>
       </aside>
       <main className="kgd-main">
-        <Routes>
-          <Route index element={<DashboardPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
-          <Route path="clients" element={<ClientsPage />} />
-          <Route path="services" element={<ServicesPage />} />
-          <Route path="team" element={<TeamPage />} />
-          <Route path="lookbook" element={<LookbookPage />} />
-          <Route path="website" element={<WebsitePage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="finances" element={<FinancesPage />} />
-          <Route path="settings" element={<SettingsPage user={user} onLogout={onLogout} />} />
-          <Route path="*" element={<Navigate to="/KGD" replace />} />
-        </Routes>
+        {guest ? <p className="kgd-status">Guest preview · Read-only access</p> : null}
+        <fieldset className="kgd-guest-content" disabled={guest}>
+          <Routes>
+            <Route index element={guest ? <Navigate to="/KGD/services" replace /> : <DashboardPage />} />
+            <Route path="calendar" element={guest ? <Navigate to="/KGD/services" replace /> : <CalendarPage />} />
+            <Route path="clients" element={guest ? <Navigate to="/KGD/services" replace /> : <ClientsPage />} />
+            <Route path="services" element={<ServicesPage />} />
+            <Route path="team" element={<TeamPage />} />
+            <Route path="lookbook" element={<LookbookPage />} />
+            <Route path="website" element={<WebsitePage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="finances" element={guest ? <Navigate to="/KGD/services" replace /> : <FinancesPage />} />
+            <Route path="settings" element={guest ? <Navigate to="/KGD/services" replace /> : <SettingsPage user={user} onLogout={onLogout} />} />
+            <Route path="*" element={<Navigate to={guest ? '/KGD/services' : '/KGD'} replace />} />
+          </Routes>
+        </fieldset>
       </main>
     </div>
   );

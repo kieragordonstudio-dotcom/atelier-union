@@ -40,6 +40,7 @@
 .kgd-sidebar-footer span { overflow: hidden; color: #aeb2bd; font-size: 11px; text-overflow: ellipsis; }
 .kgd-sidebar-footer button { width: max-content; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; font-size: 12px; }
 .kgd-main { min-height: 100vh; margin-left: 224px; }
+.kgd-guest-content { min-width: 0; margin: 0; padding: 0; border: 0; }
 .kgd-mobile-header { display: none; }
 
 .kgd-page { width: 100%; max-width: 1600px; margin: 0 auto; padding: 34px 38px 60px; }
