@@ -4,6 +4,7 @@ import {
   CircleDollarSign,
   Gauge,
   Globe2,
+  Images,
   Menu,
   Scissors,
   Settings,
@@ -12,12 +13,13 @@ import {
 } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ApiError, apiFetch, getSession } from '../lib/api';
+import { ApiError, apiFetch, getSession, resetApiSession } from '../lib/api';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { FinancesPage } from './pages/FinancesPage';
+import { LookbookPage } from './pages/LookbookPage';
 import { ServicesPage } from './pages/ServicesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TeamPage } from './pages/TeamPage';
@@ -32,6 +34,7 @@ const navigation = [
   { to: '/KGD/clients', label: 'Clients', icon: Users },
   { to: '/KGD/services', label: 'Services', icon: Scissors },
   { to: '/KGD/team', label: 'Team', icon: Users },
+  { to: '/KGD/lookbook', label: 'Lookbook', icon: Images },
   { to: '/KGD/website', label: 'Website', icon: Globe2 },
   { to: '/KGD/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/KGD/finances', label: 'Finances', icon: CircleDollarSign },
@@ -126,6 +129,7 @@ function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) 
           <Route path="clients" element={<ClientsPage />} />
           <Route path="services" element={<ServicesPage />} />
           <Route path="team" element={<TeamPage />} />
+          <Route path="lookbook" element={<LookbookPage />} />
           <Route path="website" element={<WebsitePage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="finances" element={<FinancesPage />} />
@@ -157,8 +161,12 @@ export function KgdApp() {
   }, []);
 
   async function logout() {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
-    setUser(null);
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      resetApiSession();
+      setUser(null);
+    }
   }
 
   if (loading) return <main className="kgd kgd-loading">Loading KGD...</main>;

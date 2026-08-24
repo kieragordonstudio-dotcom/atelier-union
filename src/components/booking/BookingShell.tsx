@@ -98,7 +98,7 @@ function formatSlot(slot: AvailabilitySlot | null) {
 }
 
 export function BookingShell() {
-  const { addOns, artists, treatmentCategories, treatments } = usePublicData();
+  const { addOns, artists, treatmentCategories, treatments, website } = usePublicData();
   const [params] = useSearchParams();
   const paramsKey = params.toString();
   const panelRef = useRef<HTMLElement>(null);
@@ -251,7 +251,7 @@ export function BookingShell() {
 
   function addToCalendar() {
     if (!selectedSlot) return;
-    const title = `${selectedTreatment.name} at ${siteConfig.shortName}`;
+    const title = `${selectedTreatment.name} at ${website.salonName}`;
     const description = `${selectedTreatment.name} ${total.addOns
       .map((addOn) => addOn.name)
       .join(', ')}`;
@@ -261,7 +261,7 @@ export function BookingShell() {
       'BEGIN:VEVENT',
       `SUMMARY:${title}`,
       `DESCRIPTION:${description}`,
-      `LOCATION:${siteConfig.address.line1}, ${siteConfig.address.city}`,
+      `LOCATION:${website.addressLine1}, ${website.city}`,
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\n');
@@ -1094,6 +1094,7 @@ function BookingComplete({
   cancelMessage: boolean;
   setCancelMessage: (value: boolean) => void;
 }) {
+  const { website } = usePublicData();
   const addOnText = total.addOns.length
     ? ` + ${total.addOns.map((addOn) => addOn.name).join(', ')}`
     : '';
@@ -1120,9 +1121,9 @@ function BookingComplete({
           {total.duration} min
         </p>
         <p>
-          {siteConfig.shortName}
+          {website.salonName}
           <br />
-          {siteConfig.address.line1}, {siteConfig.address.city}
+          {website.addressLine1}, {website.city}
         </p>
         <p>
           Total: {formatPrice(total.price)}
@@ -1144,7 +1145,9 @@ function BookingComplete({
         </Button>
         <a
           className="button-link ghost"
-          href="https://www.google.com/maps/search/?api=1&query=Union%20Street%20Aberdeen"
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            `${website.addressLine1}, ${website.city} ${website.postcode}`,
+          )}`}
           target="_blank"
           rel="noreferrer"
         >

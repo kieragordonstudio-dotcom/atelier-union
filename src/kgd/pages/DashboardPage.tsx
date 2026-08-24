@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import { dateTime, KgdEmpty, KgdPage, money } from '../components';
+import { salonDateTime } from '../time';
 
 type Appointment = {
   id: string;
@@ -68,7 +69,7 @@ export function DashboardPage() {
                 <div className="kgd-list">
                   {data.today.map((appointment) => (
                     <Link className="kgd-list-row" to={`/KGD/calendar?appointment=${appointment.id}`} key={appointment.id}>
-                      <time>{new Date(appointment.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time>
+                      <time>{salonDateTime(appointment.starts_at).toFormat('HH:mm')}</time>
                       <span><strong>{appointment.client_name}</strong><small>{appointment.services}</small></span>
                       <span>{appointment.artist_name}</span>
                       <span className={`kgd-badge is-${appointment.status}`}>{appointment.status.replace('_', ' ')}</span>

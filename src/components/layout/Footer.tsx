@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { siteConfig } from '../../config/site';
+import { usePublicData } from '../../data/PublicDataProvider';
 
 const footerLinks = [
   { label: 'Treatments', to: '/treatments' },
@@ -11,6 +12,12 @@ const footerLinks = [
 ];
 
 export function Footer() {
+  const { website } = usePublicData();
+  const socials = [
+    { label: 'Instagram', href: website.instagramUrl },
+    { label: 'Email', href: website.emailUrl },
+  ].filter((social) => social.href);
+
   return (
     <footer className="site-footer">
       <div className="container">
@@ -22,13 +29,13 @@ export function Footer() {
           <div>
             <p className="eyebrow">Visit</p>
             <p>
-              {siteConfig.address.line1}
+              {website.addressLine1}
               <br />
-              {siteConfig.address.city} {siteConfig.address.postcode}
+              {website.city} {website.postcode}
               <br />
-              {siteConfig.address.country}
+              {website.country}
             </p>
-            <p>{siteConfig.contactPlaceholder}</p>
+            <p>{website.contactLabel}</p>
           </div>
           <div className="footer-links" aria-label="Footer navigation">
             {footerLinks.map((link) => (
@@ -36,7 +43,7 @@ export function Footer() {
                 {link.label}
               </Link>
             ))}
-            {siteConfig.socials.map((social) => (
+            {socials.map((social) => (
               <a key={social.label} href={social.href}>
                 {social.label}
               </a>

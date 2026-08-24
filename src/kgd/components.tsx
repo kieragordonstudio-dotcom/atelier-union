@@ -85,6 +85,7 @@ export function dateTime(value: string | Date) {
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Europe/London',
   }).format(new Date(value));
 }
 
@@ -93,5 +94,6 @@ export function dateOnly(value: string | Date) {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'Europe/London',
   }).format(new Date(value));
 }

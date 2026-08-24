@@ -149,7 +149,10 @@
 .kgd-calendar-event time { color: inherit; font-size: 10px; font-weight: 800; }
 .kgd-calendar-event strong { overflow-wrap: anywhere; }
 .kgd-calendar-event small { font-size: 10px; }
-.kgd-calendar-block { display: grid; padding: 8px; border: 1px dashed #999da6; background: #f0f1f3; gap: 2px; }
+.kgd-calendar-block { display: grid; width: 100%; padding: 8px; border: 1px dashed #999da6; background: #f0f1f3; color: var(--kgd-ink); cursor: pointer; text-align: left; gap: 2px; }
+.kgd-calendar-block > span { color: #565b65; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.kgd-calendar-block.is-time_off, .kgd-month-day > button.is-time_off { border-color: #b8a88f; border-left-color: #8a6f43; background: #f6f2eb; }
+.kgd-calendar-block.is-blocked, .kgd-month-day > button.is-blocked { border-color: #aaaeb7; border-left-color: #5f646e; background: #eff0f2; }
 .kgd-day-empty { padding: 18px 4px; color: #a0a4ad; font-size: 10px; text-align: center; }
 
 .kgd-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--kgd-line); border-left: 1px solid var(--kgd-line); background: var(--kgd-paper); }
@@ -158,6 +161,9 @@
 .kgd-month-day > header { display: flex; justify-content: space-between; margin-bottom: 6px; gap: 4px; }
 .kgd-month-day > header span { color: var(--kgd-muted); font-size: 9px; }
 .kgd-month-day > button { display: block; width: 100%; margin: 0 0 4px; padding: 4px 5px; overflow: hidden; border: 0; border-left: 2px solid var(--kgd-blue); background: #edf1ff; cursor: pointer; font-size: 9px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.kgd-look-cell { display: flex; min-width: 230px; align-items: center; gap: 10px; }
+.kgd-look-cell > span { display: grid; min-width: 0; }
+.kgd-look-thumb { width: 46px; height: 46px; flex: 0 0 46px; border: 1px solid var(--kgd-line); object-fit: cover; }
 
 .kgd-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; padding: 24px; overflow-y: auto; place-items: center; background: rgba(11, 13, 18, .66); }
 .kgd-modal { width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: hidden; border: 1px solid #bfc3cb; border-radius: 3px; background: var(--kgd-paper); box-shadow: 0 24px 70px rgba(0, 0, 0, .25); }

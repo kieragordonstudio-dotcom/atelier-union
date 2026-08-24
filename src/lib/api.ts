@@ -25,6 +25,14 @@ export async function getSession() {
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return apiFetchWithRetry<T>(path, init, true);
+}
+
+async function apiFetchWithRetry<T>(
+  path: string,
+  init: RequestInit,
+  allowCsrfRetry: boolean,
+): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -33,16 +41,30 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     headers.set('x-csrf-token', csrfToken!);
   }
   const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) {
+    if (path === '/api/auth/logout') csrfToken = null;
+    return undefined as T;
+  }
   const payload = (await response.json().catch(() => null)) as
-    | { error?: { code?: string; message?: string } }
+    | { csrfToken?: string; error?: { code?: string; message?: string } }
     | T
     | null;
+  if (response.ok && payload && typeof payload === 'object' && 'csrfToken' in payload) {
+    csrfToken = payload.csrfToken ?? null;
+  }
   if (!response.ok) {
     const error =
       payload && typeof payload === 'object' && 'error' in payload
         ? payload.error
         : undefined;
+    if (
+      allowCsrfRetry &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+      error?.code === 'CSRF_INVALID'
+    ) {
+      await getSession();
+      return apiFetchWithRetry<T>(path, init, false);
+    }
     throw new ApiError(
       response.status,
       error?.code ?? 'REQUEST_FAILED',

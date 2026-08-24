@@ -2,6 +2,7 @@ import { hash } from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
 import { siteConfig } from '../../src/config/site.js';
 import { artists as artistSeed } from '../../src/data/artists.js';
+import { lookbook as lookbookSeed } from '../../src/data/lookbook.js';
 import {
   addOns,
   treatmentCategories,
@@ -15,6 +16,7 @@ import {
   businesses,
   businessMemberships,
   businessSettings,
+  lookbookEntries,
   serviceCategories,
   services,
   users,
@@ -187,6 +189,7 @@ try {
       serviceRows.push(row);
     }
 
+    const artistRows = new Map<string, string>();
     for (const [sortOrder, artist] of artistSeed.entries()) {
       const [artistRow] = await tx
         .insert(artists)
@@ -215,6 +218,7 @@ try {
           },
         })
         .returning();
+      artistRows.set(artist.name, artistRow.id);
 
       for (const service of serviceRows.filter((item) => !item.isAddOn)) {
         await tx
@@ -268,6 +272,31 @@ try {
         openingHours: siteConfig.openingHours,
       })
       .onConflictDoNothing({ target: websiteSettings.businessId });
+
+    for (const [sortOrder, look] of lookbookSeed.entries()) {
+      const treatmentId = serviceRows.find(
+        (service) => service.slug === look.suggestedBaseTreatment && !service.isAddOn,
+      )?.id;
+      if (!treatmentId) throw new Error(`Lookbook treatment missing: ${look.suggestedBaseTreatment}`);
+      await tx.insert(lookbookEntries).values({
+        businessId: business.id,
+        slug: look.id,
+        name: look.name,
+        image: look.image,
+        altText: look.alt,
+        category: look.category,
+        complexity: look.complexity,
+        description: look.description,
+        treatmentId,
+        addOnId: look.addOn
+          ? serviceRows.find((service) => service.slug === look.addOn && service.isAddOn)?.id
+          : null,
+        artistId: artistRows.get(look.artist) ?? null,
+        published: true,
+        active: true,
+        sortOrder,
+      });
+    }
     }
 
     const memberships = await tx

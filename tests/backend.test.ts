@@ -11,6 +11,8 @@ import {
   appointments,
   businessMemberships,
   clients,
+  lookbookEntries,
+  payments,
   timeOff,
   users,
   workingHours,
@@ -47,6 +49,7 @@ test('authentication rejects bad credentials and admin authorization enforces th
   try {
     const businessA = await seedBusiness(context, { slug: 'atelier-union', name: 'Atelier Union' });
     const businessB = await seedBusiness(context, { slug: 'other-salon', name: 'Other Salon' });
+    const { artist } = await seedBookingSetup(context, businessA.id);
     const [owner] = await context.db.insert(users).values({
       email: 'owner@example.com',
       normalizedEmail: 'owner@example.com',
@@ -69,9 +72,24 @@ test('authentication rejects bad credentials and admin authorization enforces th
     assert.equal(rejected.status, 401);
     assert.equal(rejected.body.error.code, 'LOGIN_REJECTED');
 
-    await agent.post('/api/auth/login').set('x-csrf-token', csrfToken).send({ email: 'owner@example.com', password: 'correct-password-123' }).expect(200);
+    const login = await agent.post('/api/auth/login').set('x-csrf-token', csrfToken).send({ email: 'owner@example.com', password: 'correct-password-123' }).expect(200);
+    const authenticatedCsrfToken = login.body.csrfToken as string;
+    assert.notEqual(authenticatedCsrfToken, csrfToken);
+    const startsAt = DateTime.now().setZone('Europe/London').plus({ days: 2 }).startOf('hour');
+    const blockPayload = {
+      artistId: artist.id,
+      type: 'blocked',
+      startsAt: startsAt.toISO(),
+      endsAt: startsAt.plus({ hours: 1 }).toISO(),
+      reason: 'CSRF regression check',
+    };
+    await agent.post('/api/admin/time-off').set('x-csrf-token', csrfToken).send(blockPayload).expect(403);
+    const createdBlock = await agent.post('/api/admin/time-off').set('x-csrf-token', authenticatedCsrfToken).send(blockPayload).expect(201);
     const listed = await agent.get('/api/admin/clients').expect(200);
     assert.equal(listed.body.clients.length, 1);
+    await agent.delete(`/api/admin/time-off/${createdBlock.body.timeOff.id}`).set('x-csrf-token', authenticatedCsrfToken).expect(204);
+    await agent.post('/api/auth/logout').set('x-csrf-token', authenticatedCsrfToken).expect(204);
+    await agent.get('/api/admin/clients').expect(401);
   } finally {
     await context.pool.end();
   }
@@ -89,10 +107,14 @@ test('availability observes working hours and time off', async () => {
     assert.ok(available.slots.length >= 3);
     assert.equal(available.days[0].status, 'good');
 
-    await context.db.insert(timeOff).values({ businessId: business.id, artistId: artist.id, startsAt: date.toUTC().toJSDate(), endsAt: date.endOf('day').toUTC().toJSDate(), reason: 'Annual leave' });
-    const blocked = await calculateAvailability(context.db, business.id, { serviceSlug: 'signature-gel', artistSlug: 'maya', addOnSlugs: [], productOn: 'none', from: date.toISODate()!, to: date.toISODate()! });
+    const [leave] = await context.db.insert(timeOff).values({ businessId: business.id, artistId: artist.id, startsAt: date.toUTC().toJSDate(), endsAt: date.plus({ days: 2 }).endOf('day').toUTC().toJSDate(), reason: 'Annual leave' }).returning();
+    const blocked = await calculateAvailability(context.db, business.id, { serviceSlug: 'signature-gel', artistSlug: 'maya', addOnSlugs: [], productOn: 'none', from: date.toISODate()!, to: date.plus({ days: 1 }).toISODate()! });
     assert.equal(blocked.slots.length, 0);
     assert.equal(blocked.days[0].status, 'full');
+    assert.equal(blocked.days[1].status, 'closed');
+    await context.db.delete(timeOff).where(eq(timeOff.id, leave.id));
+    const restored = await calculateAvailability(context.db, business.id, { serviceSlug: 'signature-gel', artistSlug: 'maya', addOnSlugs: [], productOn: 'none', from: date.toISODate()!, to: date.toISODate()! });
+    assert.ok(restored.slots.length >= 3);
   } finally {
     await context.pool.end();
   }
@@ -120,10 +142,84 @@ test('booking creation prevents overlap, matches clients, and supports cancellat
     assert.equal(clientRows.length, 1);
     assert.equal(first.clientId, second.clientId);
 
+    await updateAppointment(context.pool, business.id, first.id, {
+      artistId: artist.id,
+      startsAt: firstSlot.startsAt,
+      status: 'confirmed',
+      paymentStatus: 'deposit_recorded',
+    });
+    await updateAppointment(context.pool, business.id, first.id, { paymentStatus: 'paid' });
+    await updateAppointment(context.pool, business.id, first.id, { paymentStatus: 'paid' });
+    await updateAppointment(context.pool, business.id, first.id, { paymentStatus: 'deposit_recorded' });
+    await updateAppointment(context.pool, business.id, first.id, { paymentStatus: 'paid' });
+    const ledger = await context.db.select().from(payments).where(eq(payments.appointmentId, first.id));
+    assert.equal(ledger.length, 2);
+    assert.equal(ledger.find((payment) => payment.kind === 'deposit')?.amountPence, 1500);
+    assert.equal(ledger.find((payment) => payment.kind === 'balance')?.amountPence, 2700);
+    assert.equal(ledger.reduce((sum, payment) => sum + payment.amountPence, 0), 4200);
+
     await updateAppointment(context.pool, business.id, first.id, { status: 'cancelled' });
     const [cancelled] = await context.db.select().from(appointments).where(eq(appointments.id, first.id));
     assert.equal(cancelled.status, 'cancelled');
     assert.ok(cancelled.cancelledAt instanceof Date);
+  } finally {
+    await context.pool.end();
+  }
+});
+
+test('lookbook management is tenant-scoped and public visibility follows publishing', async () => {
+  const context = await createTestDatabase();
+  try {
+    const business = await seedBusiness(context, { slug: 'atelier-union', name: 'Atelier Union' });
+    const otherBusiness = await seedBusiness(context, { slug: 'other-salon', name: 'Other Salon' });
+    const { service, artist } = await seedBookingSetup(context, business.id);
+    const otherSetup = await seedBookingSetup(context, otherBusiness.id);
+    const [owner] = await context.db.insert(users).values({
+      email: 'owner@example.com',
+      normalizedEmail: 'owner@example.com',
+      passwordHash: await hash('correct-password-123', 4),
+    }).returning();
+    await context.db.insert(businessMemberships).values({ businessId: business.id, userId: owner.id, role: 'owner' });
+    await context.db.insert(lookbookEntries).values({
+      businessId: otherBusiness.id,
+      slug: 'private-tenant-look',
+      name: 'Private Tenant Look',
+      image: '/images/work-oxblood.webp',
+      altText: 'A private tenant look.',
+      category: 'Colour',
+      complexity: 'Low',
+      treatmentId: otherSetup.service.id,
+    });
+
+    const app = createApp(config, context, { sessionStore: new session.MemoryStore(), serveFrontend: false });
+    const agent = request.agent(app);
+    const sessionResponse = await agent.get('/api/auth/session').expect(200);
+    const login = await agent.post('/api/auth/login')
+      .set('x-csrf-token', sessionResponse.body.csrfToken)
+      .send({ email: 'owner@example.com', password: 'correct-password-123' })
+      .expect(200);
+    const csrfToken = login.body.csrfToken as string;
+    const created = await agent.post('/api/admin/lookbook').set('x-csrf-token', csrfToken).send({
+      name: 'QA Editorial Red',
+      image: '/images/work-oxblood.webp',
+      altText: 'Deep red nails in an editorial close-up.',
+      category: 'Colour',
+      complexity: 'Low',
+      description: 'A database-backed test look.',
+      treatmentId: service.id,
+      addOnId: null,
+      artistId: artist.id,
+      published: true,
+      active: true,
+    }).expect(201);
+    const adminLooks = await agent.get('/api/admin/lookbook').expect(200);
+    assert.deepEqual(adminLooks.body.looks.map((look: { name: string }) => look.name), ['QA Editorial Red']);
+    const publicLooks = await request(app).get('/api/public/lookbook').expect(200);
+    assert.deepEqual(publicLooks.body.looks.map((look: { id: string }) => look.id), ['qa-editorial-red']);
+
+    await agent.patch(`/api/admin/lookbook/${created.body.look.id}`).set('x-csrf-token', csrfToken).send({ published: false }).expect(200);
+    assert.equal((await request(app).get('/api/public/lookbook').expect(200)).body.looks.length, 0);
+    await agent.delete(`/api/admin/lookbook/${created.body.look.id}`).set('x-csrf-token', csrfToken).expect(204);
   } finally {
     await context.pool.end();
   }
@@ -134,4 +230,7 @@ test('the production migration includes database-level overlap protection', () =
   const text = readFileSync(migration, 'utf8');
   assert.match(text, /appointments_no_artist_overlap/);
   assert.match(text, /EXCLUDE USING gist/);
+  const functionalMigration = readFileSync(new URL('../migrations/0001_green_carlie_cooper.sql', import.meta.url), 'utf8');
+  assert.match(functionalMigration, /CREATE TABLE "lookbook_entries"/);
+  assert.match(functionalMigration, /payments_appointment_kind_uidx/);
 });

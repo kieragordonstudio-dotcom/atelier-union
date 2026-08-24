@@ -2,6 +2,7 @@ import { CalendarClock, Clock3, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { ApiError, apiFetch } from '../../lib/api';
 import { dateTime, KgdEmpty, KgdModal, KgdPage, KgdStatus } from '../components';
+import { fromSalonInput, toSalonInput } from '../time';
 
 type Artist = {
   id: string;
@@ -39,12 +40,6 @@ type TeamData = {
 };
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-function localInput(value?: string) {
-  if (!value) return '';
-  const date = new Date(value);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
 
 export function TeamPage() {
   const [data, setData] = useState<TeamData | null>(null);
@@ -184,12 +179,12 @@ function HoursForm({ artist, current, onClose, onSaved }: { artist: Artist; curr
 }
 
 function TimeOffForm({ artists, block, onClose, onSaved }: { artists: Artist[]; block?: TimeOff; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ artistId: block?.artist_id ?? artists[0]?.id ?? '', type: block?.type ?? 'time_off', startsAt: localInput(block?.starts_at), endsAt: localInput(block?.ends_at), reason: block?.reason ?? '' });
+  const [form, setForm] = useState({ artistId: block?.artist_id ?? artists[0]?.id ?? '', type: block?.type ?? 'time_off', startsAt: toSalonInput(block?.starts_at), endsAt: toSalonInput(block?.ends_at), reason: block?.reason ?? '' });
   const [message, setMessage] = useState('');
   async function submit(event: FormEvent) {
     event.preventDefault();
     try {
-      await apiFetch(block?.id ? `/api/admin/time-off/${block.id}` : '/api/admin/time-off', { method: block?.id ? 'PATCH' : 'POST', body: JSON.stringify({ ...form, startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() }) });
+      await apiFetch(block?.id ? `/api/admin/time-off/${block.id}` : '/api/admin/time-off', { method: block?.id ? 'PATCH' : 'POST', body: JSON.stringify({ ...form, startsAt: fromSalonInput(form.startsAt), endsAt: fromSalonInput(form.endsAt) }) });
       onSaved();
     } catch (requestError) { setMessage(requestError instanceof ApiError ? requestError.message : 'Time off could not be saved.'); }
   }

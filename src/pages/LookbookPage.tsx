@@ -2,28 +2,30 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ButtonLink } from '../components/common/Button';
 import { Seo } from '../components/common/Seo';
-import { lookbook, lookbookFilters, type LookCategory } from '../data/lookbook';
-import { getAddOnById, getTreatmentById } from '../data/treatments';
+import { lookbookFilters, type Look, type LookCategory } from '../data/lookbook';
+import { usePublicData } from '../data/PublicDataProvider';
+import type { AddOn } from '../data/treatments';
 
-function getLookAddOnLabel(look: (typeof lookbook)[number]) {
+function getLookAddOnLabel(look: Look, addOns: AddOn[]) {
   if (!look.addOn) return 'Included with treatment';
-  const addOn = getAddOnById(look.addOn);
+  const addOn = addOns.find((item) => item.id === look.addOn);
   if (!addOn) return look.addOnPrice;
   return addOn.name;
 }
 
-function getLookAddOnMeta(look: (typeof lookbook)[number]) {
+function getLookAddOnMeta(look: Look, addOns: AddOn[]) {
   if (!look.addOn) return 'Included with treatment';
-  const addOn = getAddOnById(look.addOn);
+  const addOn = addOns.find((item) => item.id === look.addOn);
   if (!addOn) return look.addOnPrice;
   return `${addOn.priceLabel} · adds ${addOn.duration} min`;
 }
 
 export function LookbookPage() {
+  const { addOns, lookbook, treatments } = usePublicData();
   const [params] = useSearchParams();
   const initialLook = params.get('look');
   const [filter, setFilter] = useState<(typeof lookbookFilters)[number]>('All');
-  const [activeLookId, setActiveLookId] = useState(initialLook ?? lookbook[0].id);
+  const [activeLookId, setActiveLookId] = useState(initialLook ?? lookbook[0]?.id ?? '');
 
   const visibleLooks = useMemo(() => {
     if (filter === 'All') return lookbook;
@@ -124,15 +126,15 @@ export function LookbookPage() {
                 <div className="simple-row">
                   <h3>Treatment</h3>
                   <p>
-                    {getTreatmentById(activeLook.suggestedBaseTreatment)?.name ??
+                    {treatments.find((treatment) => treatment.id === activeLook.suggestedBaseTreatment)?.name ??
                       'Confirm treatment during booking'}
                   </p>
                   <span />
                 </div>
                 <div className="simple-row">
                   <h3>Nail art add-on</h3>
-                  <p>{getLookAddOnLabel(activeLook)}</p>
-                  <span>{getLookAddOnMeta(activeLook)}</span>
+                  <p>{getLookAddOnLabel(activeLook, addOns)}</p>
+                  <span>{getLookAddOnMeta(activeLook, addOns)}</span>
                 </div>
                 <div className="simple-row">
                   <h3>Recommended artist</h3>

@@ -349,6 +349,9 @@ export const payments = pgTable(
   (table) => [
     index('payments_business_recorded_idx').on(table.businessId, table.recordedAt),
     index('payments_appointment_idx').on(table.appointmentId),
+    uniqueIndex('payments_appointment_kind_uidx')
+      .on(table.appointmentId, table.kind)
+      .where(sql`${table.kind} <> 'adjustment'`),
   ],
 );
 
@@ -392,6 +395,41 @@ export const websiteSettings = pgTable(
   (table) => [uniqueIndex('website_settings_business_uidx').on(table.businessId)],
 );
 
+export const lookbookEntries = pgTable(
+  'lookbook_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .notNull()
+      .references(() => businesses.id, { onDelete: 'cascade' }),
+    slug: varchar('slug', { length: 140 }).notNull(),
+    name: varchar('name', { length: 200 }).notNull(),
+    image: text('image').notNull(),
+    altText: text('alt_text').notNull(),
+    category: varchar('category', { length: 40 }).notNull(),
+    complexity: varchar('complexity', { length: 20 }).notNull(),
+    description: text('description').notNull().default(''),
+    treatmentId: uuid('treatment_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'restrict' }),
+    addOnId: uuid('add_on_id').references(() => services.id, { onDelete: 'set null' }),
+    artistId: uuid('artist_id').references(() => artists.id, { onDelete: 'set null' }),
+    published: boolean('published').notNull().default(true),
+    active: boolean('active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('lookbook_entries_business_slug_uidx').on(table.businessId, table.slug),
+    index('lookbook_entries_public_idx').on(
+      table.businessId,
+      table.published,
+      table.active,
+      table.sortOrder,
+    ),
+  ],
+);
+
 export const auditLogs = pgTable(
   'audit_logs',
   {
@@ -426,3 +464,4 @@ export type Artist = typeof artists.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
+export type LookbookEntry = typeof lookbookEntries.$inferSelect;

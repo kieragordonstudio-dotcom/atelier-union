@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { DataType, newDb } from 'pg-mem';
 import type { Pool } from 'pg';
@@ -28,19 +28,20 @@ export async function createTestDatabase() {
     implementation: () => 1,
   });
 
-  const migration = readFileSync(
-    new URL('../../migrations/0000_empty_colleen_wing.sql', import.meta.url),
-    'utf8',
-  );
-  for (const statement of migration.split('--> statement-breakpoint')) {
-    if (
-      !statement.trim() ||
-      statement.includes('CREATE EXTENSION') ||
-      statement.includes('appointments_no_artist_overlap')
-    ) {
-      continue;
+  const migrationDirectory = new URL('../../migrations/', import.meta.url);
+  for (const filename of readdirSync(migrationDirectory).filter((name) => name.endsWith('.sql')).sort()) {
+    const migration = readFileSync(new URL(filename, migrationDirectory), 'utf8');
+    for (const statement of migration.split('--> statement-breakpoint')) {
+      if (
+        !statement.trim() ||
+        statement.includes('CREATE EXTENSION') ||
+        statement.includes('appointments_no_artist_overlap') ||
+        statement.includes('INSERT INTO "lookbook_entries"')
+      ) {
+        continue;
+      }
+      memory.public.none(statement);
     }
-    memory.public.none(statement);
   }
 
   const adapter = memory.adapters.createPg();

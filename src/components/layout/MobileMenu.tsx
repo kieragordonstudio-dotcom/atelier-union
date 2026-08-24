@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { siteConfig } from '../../config/site';
+import { usePublicData } from '../../data/PublicDataProvider';
 
 const links = [
   { label: 'Treatments', to: '/treatments' },
@@ -18,6 +18,10 @@ export function MobileMenu({
   open: boolean;
   onNavigate: () => void;
 }) {
+  const { website } = usePublicData();
+  const firstHours = website.openingHours[0];
+  const lastHours = website.openingHours[website.openingHours.length - 1];
+
   return (
     <aside
       id="mobile-menu"
@@ -32,9 +36,9 @@ export function MobileMenu({
         ))}
       </nav>
       <div className="mobile-menu-meta">
-        <span>{siteConfig.address.line1}, {siteConfig.address.city}</span>
-        <span>{siteConfig.openingHours[0].days} - {siteConfig.openingHours[5].days}</span>
-        <span>{siteConfig.contactPlaceholder}</span>
+        <span>{website.addressLine1}, {website.city}</span>
+        {firstHours && lastHours ? <span>{firstHours.days} - {lastHours.days}</span> : null}
+        <span>{website.contactLabel}</span>
       </div>
     </aside>
   );

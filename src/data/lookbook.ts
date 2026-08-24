@@ -1,5 +1,3 @@
-import type { AddOnId } from './treatments';
-
 export type LookCategory =
   | 'Minimal'
   | 'French'
@@ -18,7 +16,7 @@ export type Look = {
   addOnPrice: string;
   additionalTime: string;
   suggestedBaseTreatment: string;
-  addOn?: AddOnId;
+  addOn?: string;
   artist: string;
   alt: string;
 };

@@ -2,6 +2,7 @@ import { ButtonLink } from '../components/common/Button';
 import { Seo } from '../components/common/Seo';
 import { SectionHeading } from '../components/common/SectionHeading';
 import { siteConfig } from '../config/site';
+import { usePublicData } from '../data/PublicDataProvider';
 
 const standards = [
   'Consultation before product selection',
@@ -13,6 +14,8 @@ const standards = [
 ];
 
 export function StudioPage() {
+  const { website } = usePublicData();
+
   return (
     <>
       <Seo
@@ -96,10 +99,10 @@ export function StudioPage() {
             <SectionHeading
               eyebrow="UNION STREET"
               title="Find us on Union Street"
-              copy="Union Street, Aberdeen. Right in the city centre."
+              copy={`${website.addressLine1}, ${website.city}. Right in the city centre.`}
             />
             <div className="category-list">
-              {siteConfig.openingHours.map((row) => (
+              {website.openingHours.map((row) => (
                 <div className="simple-row" key={row.days}>
                   <h3>{row.days}</h3>
                   <p>{row.hours}</p>

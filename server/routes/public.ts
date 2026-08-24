@@ -21,6 +21,55 @@ async function atelierUnionBusinessId(db: DatabaseContext['db']) {
 export function publicRoutes(context: DatabaseContext) {
   const router = Router();
 
+  router.get('/lookbook', async (_request, response, next) => {
+    try {
+      const businessId = await atelierUnionBusinessId(context.db);
+      const result = await context.pool.query(
+        `SELECT l.slug, l.name, l.image, l.alt_text, l.category, l.complexity,
+                l.description, treatment.slug AS treatment_slug,
+                addon.slug AS add_on_slug, addon.name AS add_on_name,
+                addon.price_pence AS add_on_price_pence,
+                addon.duration_minutes AS add_on_duration_minutes,
+                artist.name AS artist_name
+           FROM lookbook_entries l
+           JOIN services treatment ON treatment.id=l.treatment_id AND treatment.active=true
+           LEFT JOIN services addon ON addon.id=l.add_on_id AND addon.active=true
+           LEFT JOIN artists artist ON artist.id=l.artist_id
+          WHERE l.business_id=$1 AND l.published=true AND l.active=true
+          ORDER BY l.sort_order, l.name`,
+        [businessId],
+      );
+      response.json({
+        looks: result.rows.map((look) => {
+          const addOnPrice = Number(look.add_on_price_pence ?? 0) / 100;
+          const addOnDuration = Number(look.add_on_duration_minutes ?? 0);
+          const prefix = ['micro-french', 'chrome'].includes(look.add_on_slug) ? '+' : 'from +';
+          const priceText = look.add_on_slug
+            ? `${prefix}£${addOnPrice} · adds ${addOnDuration} min`
+            : 'Included with treatment';
+          return {
+            id: look.slug,
+            name: look.name,
+            image: look.image,
+            category: look.category,
+            complexity: look.complexity,
+            description: look.description,
+            addOnPrice: priceText,
+            additionalTime: look.add_on_slug
+              ? `Adds ${addOnDuration} min to your appointment`
+              : 'Included with treatment',
+            suggestedBaseTreatment: look.treatment_slug,
+            addOn: look.add_on_slug ?? undefined,
+            artist: look.artist_name ?? 'Any Nail Artist',
+            alt: look.alt_text,
+          };
+        }),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get('/catalog', async (_request, response, next) => {
     try {
       const businessId = await atelierUnionBusinessId(context.db);

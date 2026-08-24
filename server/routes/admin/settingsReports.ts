@@ -27,7 +27,7 @@ const businessSchema = z.object({
   city: z.string().trim().max(120),
   postcode: z.string().trim().max(32),
   country: z.string().trim().max(120),
-  timezone: z.string().trim().min(3).max(80),
+  timezone: z.literal('Europe/London'),
 });
 const bookingSettingsSchema = z.object({
   minimumNoticeHours: z.coerce.number().int().min(0).max(720),
@@ -206,17 +206,51 @@ export function settingsReportRoutes(context: DatabaseContext) {
           [businessId, days],
         ),
         context.pool.query(
-          `SELECT ar.name, COUNT(a.id)::int AS bookings,
-                  COALESCE(SUM(a.duration_minutes) FILTER (WHERE a.status <> 'cancelled'),0)::int AS booked_minutes,
-                  COALESCE((
-                    SELECT SUM(EXTRACT(EPOCH FROM (wh.end_time - wh.start_time))/60)::int
-                    FROM generate_series(current_date - ($2::int - 1), current_date, interval '1 day') day
-                    JOIN working_hours wh ON wh.artist_id=ar.id
-                      AND wh.active=true AND wh.day_of_week=EXTRACT(ISODOW FROM day)
-                  ),0)::int AS available_minutes
-             FROM artists ar LEFT JOIN appointments a ON a.artist_id=ar.id
-               AND a.starts_at >= now() - make_interval(days => $2)
-            WHERE ar.business_id=$1 GROUP BY ar.id ORDER BY ar.sort_order`,
+          `WITH business_window AS (
+             SELECT timezone,
+                    (now() AT TIME ZONE timezone)::date - ($2::int - 1) AS starts_on,
+                    (now() AT TIME ZONE timezone)::date AS ends_on
+               FROM businesses WHERE id=$1
+           ), shifts AS (
+             SELECT ar.id AS artist_id,
+                    ((day.slot::date + wh.start_time)::timestamp AT TIME ZONE bw.timezone) AS starts_at,
+                    ((day.slot::date + wh.end_time)::timestamp AT TIME ZONE bw.timezone) AS ends_at
+               FROM artists ar
+               CROSS JOIN business_window bw
+               CROSS JOIN LATERAL generate_series(bw.starts_on, bw.ends_on, interval '1 day') day(slot)
+               JOIN working_hours wh ON wh.artist_id=ar.id AND wh.business_id=$1
+                AND wh.active=true AND wh.day_of_week=EXTRACT(ISODOW FROM day.slot)
+              WHERE ar.business_id=$1
+           ), capacity AS (
+             SELECT s.artist_id,
+                    COALESCE(SUM(GREATEST(0,
+                      EXTRACT(EPOCH FROM (s.ends_at - s.starts_at))/60 -
+                      COALESCE((
+                        SELECT SUM(EXTRACT(EPOCH FROM (
+                          LEAST(t.ends_at, s.ends_at) - GREATEST(t.starts_at, s.starts_at)
+                        ))/60)
+                          FROM time_off t
+                         WHERE t.business_id=$1 AND t.artist_id=s.artist_id
+                           AND t.starts_at < s.ends_at AND t.ends_at > s.starts_at
+                      ), 0)
+                    )),0)::int AS available_minutes
+               FROM shifts s GROUP BY s.artist_id
+           ), booked AS (
+             SELECT a.artist_id, COUNT(*)::int AS bookings,
+                    COALESCE(SUM(a.duration_minutes),0)::int AS booked_minutes
+               FROM appointments a CROSS JOIN business_window bw
+              WHERE a.business_id=$1 AND a.status <> 'cancelled'
+                AND a.starts_at >= (bw.starts_on::timestamp AT TIME ZONE bw.timezone)
+                AND a.starts_at < ((bw.ends_on + 1)::timestamp AT TIME ZONE bw.timezone)
+              GROUP BY a.artist_id
+           )
+           SELECT ar.name, COALESCE(b.bookings,0)::int AS bookings,
+                  COALESCE(b.booked_minutes,0)::int AS booked_minutes,
+                  COALESCE(c.available_minutes,0)::int AS available_minutes
+             FROM artists ar
+             LEFT JOIN booked b ON b.artist_id=ar.id
+             LEFT JOIN capacity c ON c.artist_id=ar.id
+            WHERE ar.business_id=$1 ORDER BY ar.sort_order`,
           [businessId, days],
         ),
         context.pool.query(

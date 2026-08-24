@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import { AppError, ConflictError } from '../errors.js';
 
@@ -14,6 +14,32 @@ export const appointmentUpdateSchema = z
   .refine((value) => Object.keys(value).length > 0, 'At least one change is required.');
 
 export type AppointmentUpdate = z.infer<typeof appointmentUpdateSchema>;
+
+async function upsertPayment(
+  client: PoolClient,
+  input: {
+    businessId: string;
+    appointmentId: string;
+    amountPence: number;
+    kind: 'deposit' | 'balance' | 'refund';
+    status: 'deposit_recorded' | 'paid' | 'refunded';
+  },
+) {
+  const updated = await client.query(
+    `UPDATE payments SET amount_pence=$4, status=$5,
+            note='Recorded manually in KGD', recorded_at=now(), updated_at=now()
+      WHERE business_id=$1 AND appointment_id=$2 AND kind=$3`,
+    [input.businessId, input.appointmentId, input.kind, input.amountPence, input.status],
+  );
+  if (!updated.rowCount) {
+    await client.query(
+      `INSERT INTO payments
+        (business_id, appointment_id, amount_pence, kind, status, note)
+       VALUES ($1, $2, $3, $4, $5, 'Recorded manually in KGD')`,
+      [input.businessId, input.appointmentId, input.amountPence, input.kind, input.status],
+    );
+  }
+}
 
 export async function updateAppointment(
   pool: Pool,
@@ -46,31 +72,33 @@ export async function updateAppointment(
     const current = currentResult.rows[0];
     if (!current) throw new AppError(404, 'APPOINTMENT_NOT_FOUND', 'Appointment not found.');
 
+    const currentStart = DateTime.fromJSDate(current.starts_at).toUTC();
     const nextArtistId = input.artistId ?? current.artist_id;
     const nextStart = input.startsAt
       ? DateTime.fromISO(input.startsAt).toUTC()
-      : DateTime.fromJSDate(current.starts_at).toUTC();
+      : currentStart;
     if (!nextStart.isValid) throw new AppError(400, 'INVALID_START_TIME', 'Invalid start time.');
     const nextEnd = nextStart.plus({ minutes: current.duration_minutes });
     const nextStatus = input.status ?? current.status;
+    const scheduleChanged =
+      (input.artistId !== undefined && input.artistId !== current.artist_id) ||
+      (input.startsAt !== undefined && nextStart.toMillis() !== currentStart.toMillis()) ||
+      (input.status !== undefined && input.status !== current.status);
 
     for (const artistId of [...new Set([current.artist_id, nextArtistId])].sort()) {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [artistId]);
     }
 
-    if (nextStatus === 'confirmed' || nextStatus === 'completed') {
+    if (scheduleChanged && (nextStatus === 'confirmed' || nextStatus === 'completed')) {
       const artistCheck = await client.query(
         `SELECT 1
            FROM artists a
+           JOIN artist_services ars ON ars.artist_id=a.id AND ars.business_id=a.business_id
+           JOIN appointment_services aps ON aps.service_id=ars.service_id
+            AND aps.business_id=a.business_id AND aps.appointment_id=$3
+            AND aps.service_type='treatment'
           WHERE a.id = $1 AND a.business_id = $2 AND a.active = true
-            AND EXISTS (
-              SELECT 1
-                FROM appointment_services aps
-                JOIN artist_services ars ON ars.service_id = aps.service_id
-               WHERE aps.appointment_id = $3
-                 AND aps.service_type = 'treatment'
-                 AND ars.artist_id = a.id
-            )`,
+          LIMIT 1`,
         [nextArtistId, businessId, appointmentId],
       );
       if (!artistCheck.rowCount) {
@@ -146,21 +174,61 @@ export async function updateAppointment(
     );
 
     if (input.paymentStatus && input.paymentStatus !== current.payment_status) {
-      const payment =
-        input.paymentStatus === 'deposit_recorded'
-          ? { kind: 'deposit', amount: current.deposit_pence }
-          : input.paymentStatus === 'paid'
-            ? { kind: 'balance', amount: current.total_pence }
-            : input.paymentStatus === 'refunded'
-              ? { kind: 'refund', amount: -current.total_pence }
-              : null;
-      if (payment) {
+      if (input.paymentStatus === 'unpaid') {
         await client.query(
-          `INSERT INTO payments
-            (business_id, appointment_id, amount_pence, kind, status, note)
-           VALUES ($1, $2, $3, $4, $5, 'Recorded manually in KGD')`,
-          [businessId, appointmentId, payment.amount, payment.kind, input.paymentStatus],
+          `DELETE FROM payments
+            WHERE business_id=$1 AND appointment_id=$2 AND kind IN ('deposit','balance','refund')`,
+          [businessId, appointmentId],
         );
+      } else if (input.paymentStatus === 'deposit_recorded') {
+        await client.query(
+          `DELETE FROM payments
+            WHERE business_id=$1 AND appointment_id=$2 AND kind IN ('balance','refund')`,
+          [businessId, appointmentId],
+        );
+        await upsertPayment(client, {
+          businessId,
+          appointmentId,
+          amountPence: current.deposit_pence,
+          kind: 'deposit',
+          status: 'deposit_recorded',
+        });
+      } else if (input.paymentStatus === 'paid') {
+        const depositResult = await client.query(
+          `SELECT id FROM payments
+            WHERE business_id=$1 AND appointment_id=$2 AND kind='deposit' LIMIT 1`,
+          [businessId, appointmentId],
+        );
+        const hasDeposit = Boolean(depositResult.rowCount) || current.payment_status === 'deposit_recorded';
+        await client.query(
+          `DELETE FROM payments
+            WHERE business_id=$1 AND appointment_id=$2 AND kind='refund'`,
+          [businessId, appointmentId],
+        );
+        if (hasDeposit && current.deposit_pence > 0) {
+          await upsertPayment(client, {
+            businessId,
+            appointmentId,
+            amountPence: current.deposit_pence,
+            kind: 'deposit',
+            status: 'paid',
+          });
+        }
+        await upsertPayment(client, {
+          businessId,
+          appointmentId,
+          amountPence: current.total_pence - (hasDeposit ? current.deposit_pence : 0),
+          kind: 'balance',
+          status: 'paid',
+        });
+      } else if (input.paymentStatus === 'refunded') {
+        await upsertPayment(client, {
+          businessId,
+          appointmentId,
+          amountPence: -current.total_pence,
+          kind: 'refund',
+          status: 'refunded',
+        });
       }
     }
 
