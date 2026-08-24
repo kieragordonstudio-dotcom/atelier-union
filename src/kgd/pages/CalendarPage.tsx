@@ -192,7 +192,10 @@ function MonthView({ days, data, show, onSelect, onSelectBlock }: { days: DateTi
         const blocks = show === 'appointments' ? [] : data.timeOff.filter((item) => blockOverlapsDay(item, day) && (show === 'all' || item.type === show));
         const open = data.workingHours.some((item) => item.day_of_week === day.weekday && item.active);
         const itemsShown = appointments.length + blocks.length;
-        return <div className="kgd-month-day" key={key}><header><strong>{day.day}</strong><span>{open ? `${appointments.length} booked` : 'Closed'}</span></header>{blocks.slice(0, Math.max(0, 3 - appointments.length)).map((block) => <button className={`is-${block.type}`} type="button" key={block.id} onClick={() => onSelectBlock(block)}>{blockLabel(block)} · {block.artist_name}</button>)}{appointments.slice(0, Math.max(0, 3 - blocks.length)).map((appointment) => <button type="button" key={appointment.id} onClick={() => onSelect(appointment)}>{salonDateTime(appointment.starts_at).toFormat('HH:mm')} {appointment.client_name}</button>)}{itemsShown > 3 ? <small>+{itemsShown-3} more</small> : null}</div>;
+        return <div className="kgd-month-day" key={key}><header><strong>{day.day}</strong><span>{open ? `${appointments.length} booked` : 'Closed'}</span></header>{blocks.slice(0, Math.max(0, 3 - appointments.length)).map((block) => {
+          const blockDetails = `${blockLabel(block)} · ${block.artist_name} · ${block.reason} · ${dateTime(block.starts_at)} to ${dateTime(block.ends_at)}`;
+          return <button aria-label={blockDetails} className={`is-${block.type}`} type="button" title={blockDetails} key={block.id} onClick={() => onSelectBlock(block)}>{blockDetails}</button>;
+        })}{appointments.slice(0, Math.max(0, 3 - blocks.length)).map((appointment) => <button type="button" key={appointment.id} onClick={() => onSelect(appointment)}>{salonDateTime(appointment.starts_at).toFormat('HH:mm')} {appointment.client_name}</button>)}{itemsShown > 3 ? <small>+{itemsShown-3} more</small> : null}</div>;
       })}
     </div>
   );
