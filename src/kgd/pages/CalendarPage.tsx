@@ -82,6 +82,7 @@ export function CalendarPage() {
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<TimeOff | null>(null);
   const [newOpen, setNewOpen] = useState(params.get('action') === 'new');
+  const [newDate, setNewDate] = useState<string | undefined>();
   const [blockOpen, setBlockOpen] = useState(params.get('action') === 'block');
   const [error, setError] = useState('');
   const range = useMemo(() => rangeFor(view, anchor), [anchor, view]);
@@ -110,8 +111,14 @@ export function CalendarPage() {
     setSelected(null);
     setSelectedBlock(null);
     setNewOpen(false);
+    setNewDate(undefined);
     setBlockOpen(false);
     setParams({});
+  }
+
+  function openNewAppointment(day?: DateTime) {
+    setNewDate(day ? salonDateKey(day) : undefined);
+    setNewOpen(true);
   }
 
   const displayDays = Array.from(
@@ -125,7 +132,7 @@ export function CalendarPage() {
       title="Calendar"
       actions={
         <>
-          <button className="kgd-button" type="button" onClick={() => setNewOpen(true)}><CalendarPlus size={16} />New appointment</button>
+          <button className="kgd-button" type="button" onClick={() => openNewAppointment()}><CalendarPlus size={16} />New appointment</button>
           <button className="kgd-button" type="button" onClick={() => setBlockOpen(true)}><Ban size={16} />Block time</button>
         </>
       }
@@ -151,20 +158,21 @@ export function CalendarPage() {
       </div>
       {error ? <KgdStatus message={error} error /> : null}
       {!data ? <p className="kgd-loading-inline">Loading calendar...</p> : view === 'month' ? (
-        <MonthView days={displayDays} data={data} show={show} onSelect={setSelected} onSelectBlock={setSelectedBlock} />
+        <MonthView days={displayDays} data={data} show={show} onSelect={setSelected} onSelectBlock={setSelectedBlock} onCreate={openNewAppointment} />
       ) : (
-        <ScheduleView days={displayDays} data={data} show={show} onSelect={setSelected} onSelectBlock={setSelectedBlock} />
+        <ScheduleView days={displayDays} data={data} show={show} onSelect={setSelected} onSelectBlock={setSelectedBlock} onCreate={openNewAppointment} />
       )}
 
       {selected && data ? <AppointmentModal appointment={selected} artists={data.artists} onClose={closeModal} onSaved={async () => { closeModal(); await load(); }} /> : null}
       {selectedBlock ? <BlockDetailModal block={selectedBlock} onClose={closeModal} onDeleted={async () => { closeModal(); await load(); }} /> : null}
-      {newOpen && data && catalog ? <NewAppointmentModal artists={data.artists.filter((artist) => artist.active)} catalog={catalog} onClose={closeModal} onSaved={async () => { closeModal(); await load(); }} /> : null}
+      {newOpen && data && catalog ? <NewAppointmentModal artists={data.artists.filter((artist) => artist.active)} catalog={catalog} initialDate={newDate} onClose={closeModal} onSaved={async () => { closeModal(); await load(); }} /> : null}
       {blockOpen && data ? <BlockTimeModal artists={data.artists.filter((artist) => artist.active)} onClose={closeModal} onSaved={async () => { closeModal(); await load(); }} /> : null}
     </KgdPage>
   );
 }
 
-function ScheduleView({ days, data, show, onSelect, onSelectBlock }: { days: DateTime[]; data: CalendarData; show: ShowFilter; onSelect: (appointment: Appointment) => void; onSelectBlock: (block: TimeOff) => void }) {
+function ScheduleView({ days, data, show, onSelect, onSelectBlock, onCreate }: { days: DateTime[]; data: CalendarData; show: ShowFilter; onSelect: (appointment: Appointment) => void; onSelectBlock: (block: TimeOff) => void; onCreate: (day: DateTime) => void }) {
+  const today = DateTime.now().setZone(SALON_TIMEZONE).startOf('day');
   return (
     <div className={`kgd-schedule-grid ${days.length === 1 ? 'is-day' : ''}`}>
       {days.map((day) => {
@@ -172,6 +180,7 @@ function ScheduleView({ days, data, show, onSelect, onSelectBlock }: { days: Dat
         const appointments = show === 'all' || show === 'appointments' ? data.appointments.filter((item) => salonDateKey(item.starts_at) === key) : [];
         const blocks = show === 'appointments' ? [] : data.timeOff.filter((item) => blockOverlapsDay(item, day) && (show === 'all' || item.type === show));
         const hours = data.workingHours.filter((item) => item.day_of_week === day.weekday && item.active);
+        const canCreate = day >= today && hours.length > 0 && (show === 'all' || show === 'appointments');
         return (
           <section className="kgd-day-column" key={key}>
             <header><span>{day.toFormat('ccc')}</span><strong>{day.day}</strong><small>{hours.length ? hours.map((hour) => `${hour.artist_name.split(' ')[0]} ${hour.start_time.slice(0,5)}–${hour.end_time.slice(0,5)}`).join(' · ') : 'Closed'}</small></header>
@@ -185,7 +194,12 @@ function ScheduleView({ days, data, show, onSelect, onSelectBlock }: { days: Dat
                   <small>{appointment.artist_name}</small>
                 </button>
               ))}
-              {!appointments.length && !blocks.length ? <span className="kgd-day-empty">{emptyCalendarLabel(show)}</span> : null}
+              {!appointments.length && !blocks.length ? canCreate ? (
+                <button className="kgd-day-empty is-action" type="button" onClick={() => onCreate(day)}>
+                  <CalendarPlus size={14} aria-hidden="true" />
+                  New appointment
+                </button>
+              ) : <span className="kgd-day-empty">{emptyCalendarLabel(show)}</span> : null}
             </div>
           </section>
         );
@@ -194,7 +208,8 @@ function ScheduleView({ days, data, show, onSelect, onSelectBlock }: { days: Dat
   );
 }
 
-function MonthView({ days, data, show, onSelect, onSelectBlock }: { days: DateTime[]; data: CalendarData; show: ShowFilter; onSelect: (appointment: Appointment) => void; onSelectBlock: (block: TimeOff) => void }) {
+function MonthView({ days, data, show, onSelect, onSelectBlock, onCreate }: { days: DateTime[]; data: CalendarData; show: ShowFilter; onSelect: (appointment: Appointment) => void; onSelectBlock: (block: TimeOff) => void; onCreate: (day: DateTime) => void }) {
+  const today = DateTime.now().setZone(SALON_TIMEZONE).startOf('day');
   return (
     <div className="kgd-month">
       {dayNames.map((day) => <span className="kgd-month-weekday" key={day}>{day.slice(0,3)}</span>)}
@@ -204,10 +219,11 @@ function MonthView({ days, data, show, onSelect, onSelectBlock }: { days: DateTi
         const blocks = show === 'appointments' ? [] : data.timeOff.filter((item) => blockOverlapsDay(item, day) && (show === 'all' || item.type === show));
         const open = data.workingHours.some((item) => item.day_of_week === day.weekday && item.active);
         const itemsShown = appointments.length + blocks.length;
+        const canCreate = day >= today && open && itemsShown === 0 && (show === 'all' || show === 'appointments');
         return <div className="kgd-month-day" key={key}><header><strong>{day.day}</strong><span>{monthCalendarLabel(show, appointments.length, blocks.length, open)}</span></header>{blocks.slice(0, Math.max(0, 3 - appointments.length)).map((block) => {
           const blockDetails = `${blockLabel(block)} · ${block.artist_name} · ${block.reason} · ${dateTime(block.starts_at)} to ${dateTime(block.ends_at)}`;
           return <button aria-label={blockDetails} className={`is-${block.type}`} type="button" title={blockDetails} key={block.id} onClick={() => onSelectBlock(block)}>{blockDetails}</button>;
-        })}{appointments.slice(0, Math.max(0, 3 - blocks.length)).map((appointment) => <button type="button" key={appointment.id} onClick={() => onSelect(appointment)}>{salonDateTime(appointment.starts_at).toFormat('HH:mm')} {appointment.client_name}</button>)}{itemsShown > 3 ? <small>+{itemsShown-3} more</small> : null}</div>;
+        })}{appointments.slice(0, Math.max(0, 3 - blocks.length)).map((appointment) => <button type="button" key={appointment.id} onClick={() => onSelect(appointment)}>{salonDateTime(appointment.starts_at).toFormat('HH:mm')} {appointment.client_name}</button>)}{canCreate ? <button className="kgd-month-empty-action" type="button" aria-label={`New appointment on ${day.toFormat('cccc d LLLL')}`} onClick={() => onCreate(day)}>New appointment</button> : null}{itemsShown > 3 ? <small>+{itemsShown-3} more</small> : null}</div>;
       })}
     </div>
   );
@@ -230,10 +246,10 @@ function AppointmentModal({ appointment, artists, onClose, onSaved }: { appointm
   return <KgdModal title={`${appointment.client_name} · ${dateTime(appointment.starts_at)}`} onClose={onClose} wide><form className="kgd-form" onSubmit={save}><div className="kgd-detail-strip"><div><span>Service</span><strong>{appointment.services.map((service)=>service.name).join(', ')}</strong></div><div><span>Total</span><strong>{money(appointment.total_pence)}</strong></div><div><span>Source</span><strong>{appointment.booking_source}</strong></div></div><div className="kgd-form-grid"><label><span>Start</span><input type="datetime-local" value={startsAt} onChange={(event)=>setStartsAt(event.target.value)} /></label><label><span>Nail Artist</span><select value={artistId} onChange={(event)=>setArtistId(event.target.value)}>{artists.filter((artist)=>artist.active || artist.id===artistId).map((artist)=><option key={artist.id} value={artist.id}>{artist.name}</option>)}</select></label><label><span>Status</span><select value={status} onChange={(event)=>setStatus(event.target.value as Appointment['status'])}><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-show</option></select></label><label><span>Payment</span><select value={paymentStatus} onChange={(event)=>setPaymentStatus(event.target.value as Appointment['payment_status'])}><option value="unpaid">Unpaid</option><option value="deposit_recorded">Deposit recorded</option><option value="paid">Paid</option><option value="refunded">Refunded</option></select></label></div><label><span>Internal notes</span><textarea value={notes} onChange={(event)=>setNotes(event.target.value)} /></label><div className="kgd-client-summary"><strong>{appointment.client_name}</strong><span>{appointment.email}</span><span>{appointment.phone}</span>{appointment.customer_note ? <p>Customer note: {appointment.customer_note}</p> : null}</div>{message ? <KgdStatus message={message} error /> : null}<div className="kgd-form-actions"><button className="kgd-button" type="button" onClick={onClose}>Close</button><button className="kgd-button is-primary" type="submit">Save appointment</button></div></form></KgdModal>;
 }
 
-function NewAppointmentModal({ artists, catalog, onClose, onSaved }: { artists: Artist[]; catalog: Catalog; onClose: () => void; onSaved: () => void }) {
+function NewAppointmentModal({ artists, catalog, initialDate, onClose, onSaved }: { artists: Artist[]; catalog: Catalog; initialDate?: string; onClose: () => void; onSaved: () => void }) {
   const [serviceSlug, setServiceSlug] = useState(catalog.treatments[0]?.id ?? '');
   const [artistSlug, setArtistSlug] = useState(artists[0]?.slug ?? '');
-  const [date, setDate] = useState(DateTime.now().setZone(SALON_TIMEZONE).plus({ days: 1 }).toISODate()!);
+  const [date, setDate] = useState(initialDate ?? DateTime.now().setZone(SALON_TIMEZONE).plus({ days: 1 }).toISODate()!);
   const [startsAt, setStartsAt] = useState('');
   const [addOnSlugs, setAddOnSlugs] = useState<string[]>([]);
   const [productOn, setProductOn] = useState('none');
