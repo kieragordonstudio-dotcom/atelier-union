@@ -1,8 +1,17 @@
 import { FAQAccordion, type FAQItem } from '../components/common/FAQAccordion';
 import { Seo } from '../components/common/Seo';
 import { siteConfig } from '../config/site';
+import { usePublicData } from '../data/PublicDataProvider';
 
-const faqs: FAQItem[] = [
+function formatPounds(pence: number) {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: pence % 100 === 0 ? 0 : 2,
+  }).format(pence / 100);
+}
+
+const staticFaqs: FAQItem[] = [
   {
     question: 'What should I book if I am unsure?',
     answer:
@@ -48,10 +57,6 @@ const faqs: FAQItem[] = [
     answer: siteConfig.guarantee,
   },
   {
-    question: 'What is the cancellation policy?',
-    answer: siteConfig.cancellation,
-  },
-  {
     question: 'Can I choose my Nail Artist?',
     answer:
       'Yes. You can choose Maya, Sophie or Isla, or select Any Nail Artist to see the earliest appointments.',
@@ -64,6 +69,18 @@ const faqs: FAQItem[] = [
 ];
 
 export function FAQPage() {
+  const { bookingSettings } = usePublicData();
+  const deposit = formatPounds(bookingSettings.depositPence);
+  const cutoff = `${bookingSettings.cancellationCutoffHours} ${bookingSettings.cancellationCutoffHours === 1 ? 'hour' : 'hours'}`;
+  const faqs = [
+    ...staticFaqs.slice(0, 9),
+    {
+      question: 'What is the cancellation policy?',
+      answer: `Free changes are available up to ${cutoff} before the appointment. Cancellations within ${cutoff} may result in loss of the ${deposit} deposit.`,
+    },
+    ...staticFaqs.slice(9),
+  ];
+
   return (
     <>
       <Seo

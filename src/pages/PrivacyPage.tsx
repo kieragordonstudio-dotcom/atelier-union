@@ -12,8 +12,8 @@ export function PrivacyPage() {
           <p className="eyebrow">PRIVACY</p>
           <h1>Privacy notice.</h1>
           <p className="lead">
-            This concept booking form does not send details to a real salon or
-            payment provider.
+            Atelier Union is a fictional, self-initiated concept. Its booking
+            flow is a working demonstration, not a real salon service.
           </p>
         </div>
       </section>
@@ -22,22 +22,24 @@ export function PrivacyPage() {
           <article className="info-panel">
             <h3>Information requested</h3>
             <p>
-              The mock booking form asks for name, mobile and email to demonstrate
-              a realistic salon booking journey. The details stay on the page.
+              Test booking details are submitted to the KGD demo backend and
+              database to demonstrate the booking and admin workflow. Please do
+              not enter real personal information.
             </p>
           </article>
           <article className="info-panel">
             <h3>Payment</h3>
             <p>
               No card details are collected. The payment area is explicitly marked
-              as a demo and does not process money.
+              as a demo, no real payment is taken, and no information is sent to a
+              real salon.
             </p>
           </article>
           <article className="info-panel">
-            <h3>For a live salon</h3>
+            <h3>Demonstration only</h3>
             <p>
-              A real salon website would connect forms and payments only after
-              adding its own privacy policy.
+              The submitted details exist only to demonstrate how a connected
+              salon booking and owner-area workflow could operate.
             </p>
           </article>
         </div>

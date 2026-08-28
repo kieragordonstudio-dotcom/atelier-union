@@ -15,7 +15,7 @@ export function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [error, setError] = useState('');
   useEffect(() => { setData(null); apiFetch<Analytics>(`/api/admin/analytics?range=${range}`).then(setData).catch((requestError) => setError(requestError instanceof ApiError ? requestError.message : 'Analytics could not be loaded.')); }, [range]);
-  return <KgdPage eyebrow="REAL BUSINESS DATA" title="Analytics" actions={<div className="kgd-segmented" aria-label="Analytics range">{[7, 30, 90].map((days) => <button className={range === days ? 'is-active' : ''} type="button" key={days} onClick={() => setRange(days)}>{days} days</button>)}</div>}>
+  return <KgdPage eyebrow="BUSINESS INSIGHTS" title="Analytics" actions={<div className="kgd-segmented" aria-label="Analytics range">{[7, 30, 90].map((days) => <button className={range === days ? 'is-active' : ''} type="button" key={days} onClick={() => setRange(days)}>{days} days</button>)}</div>}>
     {error ? <KgdStatus message={error} error /> : null}
     {!data ? <p className="kgd-loading-inline">Loading analytics...</p> : <>
       <section className="kgd-metric-strip"><div><span>Bookings</span><strong>{data.summary.bookings}</strong></div><div><span>Completed</span><strong>{data.summary.completed_bookings}</strong></div><div><span>Cancellations</span><strong>{data.summary.cancellations}</strong></div><div><span>No-shows</span><strong>{data.summary.no_shows}</strong></div><div><span>Revenue</span><strong>{money(data.summary.revenue)}</strong></div><div><span>Average booking</span><strong>{money(data.summary.average_booking_value)}</strong></div></section>

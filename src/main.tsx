@@ -9,6 +9,7 @@ import { BookingPage } from './pages/BookingPage';
 import { FAQPage } from './pages/FAQPage';
 import { HomePage } from './pages/HomePage';
 import { LookbookPage } from './pages/LookbookPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { PoliciesPage } from './pages/PoliciesPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { ReviewsPage } from './pages/ReviewsPage';
@@ -35,7 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="book" element={<BookingPage />} />
             <Route path="policies" element={<PoliciesPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
-            <Route path="*" element={<HomePage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </PublicDataProvider>

@@ -1,6 +1,6 @@
 import { compare, hash } from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { z } from 'zod';
 import type { Database } from '../db/database.js';
 import { businesses, businessMemberships, users } from '../db/schema.js';
@@ -18,10 +18,30 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(12).max(256),
 });
 
-function regenerateSession(request: Parameters<ReturnType<typeof Router>['use']>[0] extends never ? never : any) {
+function regenerateSession(request: Request) {
   return new Promise<void>((resolve, reject) => {
     request.session.regenerate((error: Error | null) => (error ? reject(error) : resolve()));
   });
+}
+
+async function startGuestSession(db: Database, request: Request) {
+  const [business] = await db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .where(eq(businesses.slug, 'atelier-union'))
+    .limit(1);
+  if (!business) {
+    throw new AppError(401, 'LOGIN_REJECTED', 'Guest preview is unavailable.');
+  }
+  await regenerateSession(request);
+  request.session.businessId = business.id;
+  request.session.role = 'guest';
+  request.session.isGuest = true;
+  return {
+    authenticated: true,
+    csrfToken: ensureCsrfToken(request),
+    user: { id: 'guest', email: 'guest', role: 'guest' as const, businessId: business.id },
+  };
 }
 
 export function authRoutes(db: Database) {
@@ -81,24 +101,7 @@ export function authRoutes(db: Database) {
       const input = loginSchema.parse(request.body);
       const identifier = (input.identifier ?? input.email ?? '').toLowerCase();
       if (identifier === 'guest' && input.password === 'guest') {
-        const [business] = await db
-          .select({ id: businesses.id })
-          .from(businesses)
-          .where(eq(businesses.slug, 'atelier-union'))
-          .limit(1);
-        if (!business) {
-          throw new AppError(401, 'LOGIN_REJECTED', 'Username/email or password is incorrect.');
-        }
-        await regenerateSession(request);
-        request.session.businessId = business.id;
-        request.session.role = 'guest';
-        request.session.isGuest = true;
-        const csrfToken = ensureCsrfToken(request);
-        response.json({
-          authenticated: true,
-          csrfToken,
-          user: { id: 'guest', email: 'guest', role: 'guest', businessId: business.id },
-        });
+        response.json(await startGuestSession(db, request));
         return;
       }
 
@@ -141,6 +144,14 @@ export function authRoutes(db: Database) {
           businessId: match.businessId,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/guest', async (request, response, next) => {
+    try {
+      response.json(await startGuestSession(db, request));
     } catch (error) {
       next(error);
     }

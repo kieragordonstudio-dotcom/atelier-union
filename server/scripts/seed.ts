@@ -1,5 +1,6 @@
 import { hash } from 'bcryptjs';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt, inArray, like, lt } from 'drizzle-orm';
+import { DateTime } from 'luxon';
 import { siteConfig } from '../../src/config/site.js';
 import { artists as artistSeed } from '../../src/data/artists.js';
 import { lookbook as lookbookSeed } from '../../src/data/lookbook.js';
@@ -13,10 +14,14 @@ import { createDatabase } from '../db/database.js';
 import {
   artistServices,
   artists,
+  appointments,
+  appointmentServices,
   businesses,
   businessMemberships,
   businessSettings,
+  clients,
   lookbookEntries,
+  payments,
   serviceCategories,
   services,
   users,
@@ -41,6 +46,45 @@ function splitHours(value: string) {
   const [start, end] = value.split(' - ').map((part) => part.trim());
   return { start, end };
 }
+
+const demoClients = [
+  ['Amelia Demo', 'amelia.demo@example.com', '+44 7700 900101'],
+  ['Beth Example', 'beth.example@example.com', '+44 7700 900102'],
+  ['Cara Sample', 'cara.sample@example.com', '+44 7700 900103'],
+  ['Daisy Demo', 'daisy.demo@example.com', '+44 7700 900104'],
+  ['Eva Example', 'eva.example@example.com', '+44 7700 900105'],
+  ['Freya Sample', 'freya.sample@example.com', '+44 7700 900106'],
+  ['Grace Demo', 'grace.demo@example.com', '+44 7700 900107'],
+  ['Holly Example', 'holly.example@example.com', '+44 7700 900108'],
+  ['Imogen Sample', 'imogen.sample@example.com', '+44 7700 900109'],
+] as const;
+
+const demoAppointmentCandidates = [
+  { dayOffset: -30, hour: 10 },
+  { dayOffset: -27, hour: 13 },
+  { dayOffset: -24, hour: 15 },
+  { dayOffset: -21, hour: 11 },
+  { dayOffset: -18, hour: 14 },
+  { dayOffset: -15, hour: 16 },
+  { dayOffset: -12, hour: 10 },
+  { dayOffset: -10, hour: 13 },
+  { dayOffset: -8, hour: 15 },
+  { dayOffset: -6, hour: 11 },
+  { dayOffset: -4, hour: 14 },
+  { dayOffset: -2, hour: 16 },
+  { dayOffset: 1, hour: 10 },
+  { dayOffset: 2, hour: 13 },
+  { dayOffset: 3, hour: 15 },
+  { dayOffset: 5, hour: 11 },
+  { dayOffset: 6, hour: 14 },
+  { dayOffset: 8, hour: 16 },
+  { dayOffset: 10, hour: 10 },
+  { dayOffset: 12, hour: 13 },
+  { dayOffset: 14, hour: 15 },
+  { dayOffset: 16, hour: 11 },
+  { dayOffset: 18, hour: 14 },
+  { dayOffset: 20, hour: 16 },
+] as const;
 
 try {
   await db.transaction(async (tx) => {
@@ -299,6 +343,211 @@ try {
     }
     }
 
+    const [demoArtists, demoServices, settingsRows] = await Promise.all([
+      tx
+        .select({ id: artists.id, slug: artists.slug })
+        .from(artists)
+        .where(eq(artists.businessId, business.id)),
+      tx
+        .select({
+          id: services.id,
+          slug: services.slug,
+          name: services.name,
+          durationMinutes: services.durationMinutes,
+          pricePence: services.pricePence,
+        })
+        .from(services)
+        .where(
+          and(
+            eq(services.businessId, business.id),
+            eq(services.isAddOn, false),
+          ),
+        ),
+      tx
+        .select({ depositPence: businessSettings.depositPence })
+        .from(businessSettings)
+        .where(eq(businessSettings.businessId, business.id))
+        .limit(1),
+    ]);
+    if (!demoArtists.length || !demoServices.length) {
+      throw new Error('Artists and services must exist before demo activity can be seeded.');
+    }
+
+    const preferredServiceSlugs = [
+      'signature-gel',
+      'builder-gel-new',
+      'gel-pedicure',
+      'builder-gel-infill',
+      'soft-gel-extensions',
+      'naked-manicure',
+    ];
+    const orderedDemoServices = preferredServiceSlugs
+      .map((slug) => demoServices.find((service) => service.slug === slug))
+      .filter((service): service is (typeof demoServices)[number] => Boolean(service));
+    const availableDemoServices = orderedDemoServices.length ? orderedDemoServices : demoServices;
+    const depositPence = settingsRows[0]?.depositPence ?? 1500;
+    const today = DateTime.now().setZone('Europe/London').startOf('day');
+    const existingDemoAppointments = await tx
+      .select({ internalNotes: appointments.internalNotes })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.businessId, business.id),
+          like(appointments.internalNotes, 'KGD synthetic demo appointment %'),
+        ),
+      );
+    const existingDemoMarkers = new Set(
+      existingDemoAppointments.map((appointment) => appointment.internalNotes),
+    );
+    let seededAppointmentCount = existingDemoMarkers.size;
+
+    for (const [candidateIndex, candidate] of demoAppointmentCandidates.entries()) {
+      if (seededAppointmentCount >= 18) break;
+      const marker = `KGD synthetic demo appointment ${String(candidateIndex + 1).padStart(2, '0')}`;
+      if (existingDemoMarkers.has(marker)) continue;
+
+      let startsAt = today
+        .plus({ days: candidate.dayOffset })
+        .set({ hour: candidate.hour, minute: candidateIndex % 2 === 0 ? 0 : 30 });
+      if (startsAt.weekday === 7) {
+        startsAt = startsAt.plus({ days: candidate.dayOffset < 0 ? -1 : 1 });
+      }
+      const artist = demoArtists[candidateIndex % demoArtists.length];
+      const service = availableDemoServices[candidateIndex % availableDemoServices.length];
+      const endsAt = startsAt.plus({ minutes: service.durationMinutes });
+      const isFuture = startsAt > DateTime.now().setZone('Europe/London');
+      const status = isFuture
+        ? 'confirmed'
+        : candidateIndex % 9 === 2
+          ? 'cancelled'
+          : candidateIndex % 10 === 4
+            ? 'no_show'
+            : 'completed';
+      const paymentStatus = status === 'completed'
+        ? 'paid'
+        : status === 'cancelled' && candidateIndex % 2 === 0
+          ? 'refunded'
+          : status === 'confirmed' && candidateIndex % 3 === 1
+            ? 'unpaid'
+            : 'deposit_recorded';
+
+      if (status === 'confirmed' || status === 'completed') {
+        const [conflict] = await tx
+          .select({ id: appointments.id })
+          .from(appointments)
+          .where(
+            and(
+              eq(appointments.artistId, artist.id),
+              inArray(appointments.status, ['confirmed', 'completed']),
+              lt(appointments.startsAt, endsAt.toUTC().toJSDate()),
+              gt(appointments.endsAt, startsAt.toUTC().toJSDate()),
+            ),
+          )
+          .limit(1);
+        if (conflict) continue;
+      }
+
+      const clientSeed = demoClients[candidateIndex % demoClients.length];
+      const normalizedEmail = clientSeed[1].toLowerCase();
+      let [client] = await tx
+        .select()
+        .from(clients)
+        .where(
+          and(
+            eq(clients.businessId, business.id),
+            eq(clients.normalizedEmail, normalizedEmail),
+          ),
+        )
+        .limit(1);
+      if (!client) {
+        [client] = await tx
+          .insert(clients)
+          .values({
+            businessId: business.id,
+            name: clientSeed[0],
+            email: clientSeed[1],
+            normalizedEmail,
+            phone: clientSeed[2],
+            normalizedPhone: clientSeed[2].replace(/\s/g, ''),
+            notes: 'Synthetic demonstration client. Not a real person.',
+          })
+          .returning();
+      }
+
+      const effectiveDeposit = Math.min(depositPence, service.pricePence);
+      const [appointment] = await tx
+        .insert(appointments)
+        .values({
+          businessId: business.id,
+          clientId: client.id,
+          artistId: artist.id,
+          startsAt: startsAt.toUTC().toJSDate(),
+          endsAt: endsAt.toUTC().toJSDate(),
+          durationMinutes: service.durationMinutes,
+          totalPence: service.pricePence,
+          depositPence: effectiveDeposit,
+          paymentStatus,
+          status,
+          customerNote: 'Synthetic demonstration appointment.',
+          internalNotes: marker,
+          bookingSource: 'demo-seed',
+          cancelledAt: status === 'cancelled' ? startsAt.minus({ days: 1 }).toUTC().toJSDate() : null,
+        })
+        .returning();
+      await tx.insert(appointmentServices).values({
+        businessId: business.id,
+        appointmentId: appointment.id,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceSlug: service.slug,
+        serviceType: 'treatment',
+        durationMinutes: service.durationMinutes,
+        pricePence: service.pricePence,
+      });
+
+      const recordedAt = isFuture
+        ? DateTime.now().minus({ hours: candidateIndex + 1 }).toJSDate()
+        : startsAt.minus({ days: 2 }).toUTC().toJSDate();
+      if (paymentStatus === 'deposit_recorded' || paymentStatus === 'refunded' || paymentStatus === 'paid') {
+        await tx.insert(payments).values({
+          businessId: business.id,
+          appointmentId: appointment.id,
+          amountPence: effectiveDeposit,
+          kind: 'deposit',
+          status: paymentStatus === 'deposit_recorded' ? 'deposit_recorded' : 'paid',
+          note: 'Synthetic demo payment.',
+          recordedAt,
+        });
+      }
+      if (paymentStatus === 'paid') {
+        await tx.insert(payments).values({
+          businessId: business.id,
+          appointmentId: appointment.id,
+          amountPence: service.pricePence - effectiveDeposit,
+          kind: 'balance',
+          status: 'paid',
+          note: 'Synthetic demo payment.',
+          recordedAt,
+        });
+      }
+      if (paymentStatus === 'refunded') {
+        await tx.insert(payments).values({
+          businessId: business.id,
+          appointmentId: appointment.id,
+          amountPence: -effectiveDeposit,
+          kind: 'refund',
+          status: 'refunded',
+          note: 'Synthetic demo refund.',
+          recordedAt,
+        });
+      }
+      seededAppointmentCount += 1;
+    }
+
+    if (seededAppointmentCount < 15) {
+      throw new Error(`Only ${seededAppointmentCount} synthetic demo appointments could be seeded.`);
+    }
+
     const memberships = await tx
       .select()
       .from(businessMemberships)
@@ -311,7 +560,7 @@ try {
     if (!memberships.length) throw new Error('Owner membership was not created.');
   });
 
-  console.log('Atelier Union seed complete. No clients or appointments were created.');
+  console.log('Atelier Union seed complete, including idempotent synthetic demo activity.');
 } finally {
   await pool.end();
 }

@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { DateTime } from 'luxon';
 import type { DatabaseContext } from '../db/database.js';
 import { businesses } from '../db/schema.js';
@@ -20,6 +21,18 @@ async function atelierUnionBusinessId(db: DatabaseContext['db']) {
 
 export function publicRoutes(context: DatabaseContext) {
   const router = Router();
+  const appointmentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 6,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: {
+      error: {
+        code: 'BOOKING_RATE_LIMITED',
+        message: 'Too many booking attempts. Please try again in 15 minutes.',
+      },
+    },
+  });
 
   router.get('/lookbook', async (_request, response, next) => {
     try {
@@ -130,7 +143,7 @@ export function publicRoutes(context: DatabaseContext) {
     }
   });
 
-  router.post('/appointments', async (request, response, next) => {
+  router.post('/appointments', appointmentLimiter, async (request, response, next) => {
     try {
       const businessId = await atelierUnionBusinessId(context.db);
       const input = createAppointmentSchema.parse(request.body);

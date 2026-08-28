@@ -95,9 +95,8 @@ test('authentication rejects bad credentials and admin authorization enforces th
 
     const guestAgent = request.agent(app);
     const guestSession = await guestAgent.get('/api/auth/session').expect(200);
-    const guestLogin = await guestAgent.post('/api/auth/login')
+    const guestLogin = await guestAgent.post('/api/auth/guest')
       .set('x-csrf-token', guestSession.body.csrfToken)
-      .send({ identifier: 'guest', password: 'guest' })
       .expect(200);
     assert.equal(guestLogin.body.user.role, 'guest');
     assert.equal((await guestAgent.get('/api/auth/session').expect(200)).body.user.role, 'guest');
@@ -155,6 +154,35 @@ test('public catalog exposes current booking settings', async () => {
       cancellationCutoffHours: 36,
       maximumAdvanceDays: 90,
     });
+  } finally {
+    await context.pool.end();
+  }
+});
+
+test('public appointment submissions are limited without affecting public reads', async () => {
+  const context = await createTestDatabase();
+  try {
+    await seedBusiness(context, { slug: 'atelier-union', name: 'Atelier Union' });
+    const app = createApp(config, context, { sessionStore: new session.MemoryStore(), serveFrontend: false });
+    const agent = request.agent(app);
+    const sessionResponse = await agent.get('/api/auth/session').expect(200);
+    const csrfToken = sessionResponse.body.csrfToken as string;
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      await agent
+        .post('/api/public/appointments')
+        .set('x-csrf-token', csrfToken)
+        .send({})
+        .expect(400);
+    }
+    const limited = await agent
+      .post('/api/public/appointments')
+      .set('x-csrf-token', csrfToken)
+      .send({})
+      .expect(429);
+    assert.equal(limited.body.error.code, 'BOOKING_RATE_LIMITED');
+    assert.equal(limited.body.error.message, 'Too many booking attempts. Please try again in 15 minutes.');
+    await agent.get('/api/public/catalog').expect(200);
   } finally {
     await context.pool.end();
   }

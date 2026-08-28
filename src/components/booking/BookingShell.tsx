@@ -918,7 +918,7 @@ function getAvailabilityStatus(
     return { tone: 'closed', label: 'Unavailable', shortLabel: 'Closed', disabled: true };
   }
   if (loading) {
-    return { tone: 'closed', label: 'Checking availability', shortLabel: '...', disabled: true };
+    return { tone: 'closed', label: 'Checking availability', shortLabel: '...', disabled: false };
   }
   const day = days.find((item) => item.date === date);
   if (!day || day.status === 'closed') {
@@ -1013,6 +1013,9 @@ function ConfirmStep({
           Total {formatPrice(total.price)}
         </p>
       </article>
+      <p className="muted">
+        Demo booking. Please do not enter real personal information. No real payment is taken.
+      </p>
       <form className="form-grid" style={{ marginTop: 'var(--space-6)' }}>
         <label className="field">
           <span>Full name</span>
@@ -1181,7 +1184,7 @@ function BookingComplete({
           Get directions
         </a>
         <Button tone="ghost" onClick={onChange}>
-          Change appointment
+          Book another appointment
         </Button>
         <Button tone="ghost" onClick={() => setCancelMessage(true)}>
           Cancel appointment

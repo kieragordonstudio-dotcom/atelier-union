@@ -70,6 +70,23 @@ function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
     }
   }
 
+  async function enterGuestDemo() {
+    setSubmitting(true);
+    setError('');
+    try {
+      const result = await apiFetch<{ user: KgdUser }>('/api/auth/guest', {
+        method: 'POST',
+      });
+      onLogin(result.user);
+    } catch (requestError) {
+      setError(
+        requestError instanceof ApiError ? requestError.message : 'Guest preview failed.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="kgd kgd-login-shell">
       <section className="kgd-login-panel">
@@ -90,6 +107,12 @@ function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
             Sign in
           </button>
         </form>
+        <p className="kgd-help" style={{ marginTop: 24 }}>
+          Explore selected KGD owner-area features using illustrative Atelier Union data. Changes are disabled.
+        </p>
+        <button className="kgd-button" type="button" disabled={submitting} onClick={() => void enterGuestDemo()}>
+          Enter read-only demo
+        </button>
       </section>
     </main>
   );

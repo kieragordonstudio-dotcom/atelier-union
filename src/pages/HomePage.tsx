@@ -4,7 +4,6 @@ import { Seo } from '../components/common/Seo';
 import { SectionHeading } from '../components/common/SectionHeading';
 import { TrustStrip } from '../components/common/TrustStrip';
 import { siteConfig } from '../config/site';
-import { lookbook } from '../data/lookbook';
 import { usePublicData } from '../data/PublicDataProvider';
 import { reviews } from '../data/reviews';
 
@@ -42,7 +41,7 @@ const process = [
 ];
 
 export function HomePage() {
-  const { artists, treatmentCategories, treatments } = usePublicData();
+  const { artists, lookbook, treatmentCategories, treatments, website } = usePublicData();
   const featuredTreatments = treatments.filter((treatment) => treatment.featured);
   const signatureLooks = lookbook.slice(0, 4);
 
@@ -267,9 +266,9 @@ export function HomePage() {
       <section className="section tight">
         <div className="container studio-standard-grid">
           <div>
-            <p className="eyebrow">UNION STREET</p>
-            <h2>Find us on Union Street</h2>
-            <p className="lead">Union Street, Aberdeen. Right in the city centre.</p>
+            <p className="eyebrow">{website.addressLine1.toUpperCase()}</p>
+            <h2>Find us on {website.addressLine1}</h2>
+            <p className="lead">{website.addressLine1}, {website.city}. Right in the city centre.</p>
           </div>
           <figure className="image-frame" style={{ aspectRatio: '16 / 10' }}>
             <img

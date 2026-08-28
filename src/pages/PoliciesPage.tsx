@@ -1,7 +1,20 @@
 import { Seo } from '../components/common/Seo';
 import { siteConfig } from '../config/site';
+import { usePublicData } from '../data/PublicDataProvider';
+
+function formatPounds(pence: number) {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: pence % 100 === 0 ? 0 : 2,
+  }).format(pence / 100);
+}
 
 export function PoliciesPage() {
+  const { bookingSettings } = usePublicData();
+  const deposit = formatPounds(bookingSettings.depositPence);
+  const cutoff = `${bookingSettings.cancellationCutoffHours} ${bookingSettings.cancellationCutoffHours === 1 ? 'hour' : 'hours'}`;
+
   return (
     <>
       <Seo
@@ -22,12 +35,18 @@ export function PoliciesPage() {
           <article className="info-panel">
             <p className="eyebrow">Booking</p>
             <h3>Demo deposit</h3>
-            <p>{siteConfig.bookingPolicy}</p>
+            <p>
+              A {deposit} demo deposit is shown during booking and deducted from
+              the final bill. No real payment is taken on this concept site.
+            </p>
           </article>
           <article className="info-panel">
             <p className="eyebrow">Cancellation</p>
-            <h3>Twenty-four hours</h3>
-            <p>{siteConfig.cancellation}</p>
+            <h3>{cutoff}</h3>
+            <p>
+              Free changes are available up to {cutoff} before the appointment.
+              Cancellations within {cutoff} may result in loss of the {deposit} deposit.
+            </p>
           </article>
           <article className="info-panel">
             <p className="eyebrow">Hygiene</p>
