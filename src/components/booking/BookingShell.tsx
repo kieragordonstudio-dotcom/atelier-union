@@ -103,6 +103,7 @@ export function BookingShell() {
   const [params] = useSearchParams();
   const paramsKey = params.toString();
   const panelRef = useRef<HTMLElement>(null);
+  const appliedParamsKeyRef = useRef(paramsKey);
   const initialTreatment = useMemo(
     () => getInitialTreatment(params, treatments),
     [paramsKey, treatments],
@@ -150,6 +151,14 @@ export function BookingShell() {
   }, [addOns, selectedTreatment]);
 
   useEffect(() => {
+    setSelectedTreatment((current) =>
+      treatments.find((treatment) => treatment.id === current.id) ?? current,
+    );
+  }, [treatments]);
+
+  useEffect(() => {
+    if (appliedParamsKeyRef.current === paramsKey) return;
+    appliedParamsKeyRef.current = paramsKey;
     const nextTreatment = getInitialTreatment(params, treatments);
     const nextArtist = artists.find((artist) => artist.id === params.get('artist'))?.id ?? 'any';
     setStep(0);

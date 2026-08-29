@@ -159,6 +159,78 @@ test('public catalog exposes current booking settings', async () => {
   }
 });
 
+test('public availability slot can be booked once through the HTTP API', async () => {
+  const context = await createTestDatabase();
+  try {
+    const business = await seedBusiness(context, { slug: 'atelier-union', name: 'Atelier Union' });
+    const { artist } = await seedBookingSetup(context, business.id);
+    let date = DateTime.now().setZone('Europe/London').plus({ days: 5 }).startOf('day');
+    if (date.weekday === 7) date = date.plus({ days: 1 });
+    await context.db.insert(workingHours).values({
+      businessId: business.id,
+      artistId: artist.id,
+      dayOfWeek: date.weekday,
+      startTime: '09:00',
+      endTime: '13:00',
+    });
+
+    const app = createApp(config, context, { sessionStore: new session.MemoryStore(), serveFrontend: false });
+    const agent = request.agent(app);
+    const sessionResponse = await agent.get('/api/auth/session').expect(200);
+    const csrfToken = sessionResponse.body.csrfToken as string;
+    const dateKey = date.toISODate()!;
+    const availability = await agent
+      .get('/api/public/availability')
+      .query({
+        service: 'signature-gel',
+        artist: 'any',
+        addOns: '',
+        productOn: 'none',
+        from: dateKey,
+        to: dateKey,
+      })
+      .expect(200);
+    const slot = availability.body.slots[0] as { startsAt: string; artist: string } | undefined;
+    assert.ok(slot, 'Expected the seeded salon to return a future public slot.');
+
+    const bookingPayload = {
+      serviceSlug: 'signature-gel',
+      artistSlug: slot.artist,
+      startsAt: slot.startsAt,
+      addOnSlugs: [],
+      productOn: 'none',
+      customer: {
+        fullName: 'Public Booking Demo',
+        email: 'public-booking-demo@example.com',
+        mobile: '+44 7700 900321',
+        note: 'Synthetic integration test booking.',
+      },
+    };
+    const created = await agent
+      .post('/api/public/appointments')
+      .set('x-csrf-token', csrfToken)
+      .send(bookingPayload)
+      .expect(201);
+    const [persisted] = await context.db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.id, created.body.appointment.id))
+      .limit(1);
+    assert.ok(persisted);
+    assert.equal(persisted.bookingSource, 'public');
+    assert.equal(persisted.status, 'confirmed');
+
+    const duplicate = await agent
+      .post('/api/public/appointments')
+      .set('x-csrf-token', csrfToken)
+      .send(bookingPayload)
+      .expect(409);
+    assert.equal(duplicate.body.error.code, 'BOOKING_CONFLICT');
+  } finally {
+    await context.pool.end();
+  }
+});
+
 test('public appointment submissions are limited without affecting public reads', async () => {
   const context = await createTestDatabase();
   try {
