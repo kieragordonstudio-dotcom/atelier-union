@@ -139,12 +139,13 @@ export function BookingShell() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setSelectedAddOns((current) =>
-      current.filter((id) => {
+    setSelectedAddOns((current) => {
+      const compatible = current.filter((id) => {
         const addOn = addOns.find((item) => item.id === id);
         return addOn ? canUseAddOn(selectedTreatment, addOn) : false;
-      }),
-    );
+      });
+      return compatible.length === current.length ? current : compatible;
+    });
     if (!selectedTreatment.allowsProductRemoval) {
       setProductOn('none');
     }
@@ -668,7 +669,13 @@ function TimeStep({
   const nextMonthDisabled = calendarMonth >= lastCalendarMonth;
 
   useEffect(() => {
-    setCalendarMonth(startOfMonth(dateFromKey(selectedDate)));
+    setCalendarMonth((current) => {
+      const next = startOfMonth(dateFromKey(selectedDate));
+      return current.getFullYear() === next.getFullYear() &&
+        current.getMonth() === next.getMonth()
+        ? current
+        : next;
+    });
   }, [selectedDate]);
 
   useEffect(() => {
@@ -709,6 +716,23 @@ function TimeStep({
       active = false;
     };
   }, [artistId, calendarDates, productOn, selectedAddOns, selectedTreatment.id]);
+
+  useEffect(() => {
+    if (loadingAvailability || !availability) return;
+    const slotsOnSelectedDate = availability.slots.filter(
+      (slot) => slot.date === selectedDate,
+    );
+    if (
+      !slotsOnSelectedDate.length ||
+      slotsOnSelectedDate.some((slot) => slot.group === timeGroup)
+    ) {
+      return;
+    }
+    const firstAvailableGroup = groups.find((group) =>
+      slotsOnSelectedDate.some((slot) => slot.group === group),
+    );
+    if (firstAvailableGroup) setTimeGroup(firstAvailableGroup);
+  }, [availability, loadingAvailability, selectedDate, setTimeGroup, timeGroup]);
 
   function chooseDate(date: Date) {
     setSelectedDate(toDateKey(date));
