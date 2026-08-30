@@ -59,8 +59,9 @@ test('authentication rejects bad credentials and admin authorization enforces th
     }).returning();
     await context.db.insert(businessMemberships).values({ businessId: businessA.id, userId: owner.id, role: 'owner' });
     await context.db.insert(clients).values([
-      { businessId: businessA.id, name: 'Atelier Client', email: 'atelier@example.com', normalizedEmail: 'atelier@example.com' },
-      { businessId: businessB.id, name: 'Other Client', email: 'other@example.com', normalizedEmail: 'other@example.com' },
+      { businessId: businessA.id, name: 'Atelier Client', email: 'atelier@example.com', normalizedEmail: 'atelier@example.com', notes: '' },
+      { businessId: businessA.id, name: 'Demo Client', email: 'demo@example.com', normalizedEmail: 'demo@example.com', notes: 'Synthetic demonstration client. Not a real person.' },
+      { businessId: businessB.id, name: 'Other Client', email: 'other@example.com', normalizedEmail: 'other@example.com', notes: '' },
     ]);
 
     const app = createApp(config, context, { sessionStore: new session.MemoryStore(), serveFrontend: false });
@@ -88,7 +89,7 @@ test('authentication rejects bad credentials and admin authorization enforces th
     await agent.post('/api/admin/time-off').set('x-csrf-token', csrfToken).send(blockPayload).expect(403);
     const createdBlock = await agent.post('/api/admin/time-off').set('x-csrf-token', authenticatedCsrfToken).send(blockPayload).expect(201);
     const listed = await agent.get('/api/admin/clients').expect(200);
-    assert.equal(listed.body.clients.length, 1);
+    assert.equal(listed.body.clients.length, 2);
     await agent.delete(`/api/admin/time-off/${createdBlock.body.timeOff.id}`).set('x-csrf-token', authenticatedCsrfToken).expect(204);
     await agent.post('/api/auth/logout').set('x-csrf-token', authenticatedCsrfToken).expect(204);
     await agent.get('/api/admin/clients').expect(401);
@@ -101,7 +102,11 @@ test('authentication rejects bad credentials and admin authorization enforces th
     assert.equal(guestLogin.body.user.role, 'guest');
     assert.equal((await guestAgent.get('/api/auth/session').expect(200)).body.user.role, 'guest');
     await guestAgent.get('/api/admin/services').expect(200);
-    await guestAgent.get('/api/admin/clients').expect(403);
+    const guestClients = await guestAgent.get('/api/admin/clients').expect(200);
+    assert.equal(guestClients.body.clients.length, 1);
+    await guestAgent.get('/api/admin/clients/export.csv').expect(200);
+    const guestSettings = await guestAgent.get('/api/admin/settings').expect(200);
+    assert.deepEqual(guestSettings.body.auditLogs, []);
     await guestAgent.patch('/api/admin/website')
       .set('x-csrf-token', guestLogin.body.csrfToken)
       .send({ salonName: 'Blocked guest edit' })

@@ -108,7 +108,7 @@ export function settingsReportRoutes(context: DatabaseContext) {
         business: business.rows[0],
         booking: booking.rows[0],
         owner: { email: auth.email, role: auth.role },
-        auditLogs: audits.rows,
+        auditLogs: auth.role === 'guest' ? [] : audits.rows,
       });
     } catch (error) {
       next(error);
@@ -293,7 +293,14 @@ export function settingsReportRoutes(context: DatabaseContext) {
 
   router.get('/finances', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
+      const appointmentScope = auth.role === 'guest'
+        ? " AND booking_source = 'demo-seed'"
+        : '';
+      const paymentScope = auth.role === 'guest'
+        ? " AND EXISTS (SELECT 1 FROM appointments demo WHERE demo.id = payments.appointment_id AND demo.booking_source = 'demo-seed')"
+        : '';
       const days = reportRangeSchema.parse(request.query.range);
       const [summary, months, settings] = await Promise.all([
         context.pool.query(
@@ -304,15 +311,15 @@ export function settingsReportRoutes(context: DatabaseContext) {
              COALESCE(SUM(total_pence - CASE WHEN payment_status IN ('deposit_recorded','paid') THEN deposit_pence ELSE 0 END)
                FILTER (WHERE status IN ('confirmed','completed') AND payment_status <> 'paid'),0)::int AS outstanding_balances,
              COALESCE((SELECT SUM(amount_pence) FROM payments WHERE business_id=$1
-               AND kind IN ('refund','adjustment') AND recorded_at >= now()-make_interval(days=>$2)),0)::int AS refunds_adjustments
-           FROM appointments WHERE business_id=$1 AND starts_at >= now()-make_interval(days=>$2)`,
+               AND kind IN ('refund','adjustment') AND recorded_at >= now()-make_interval(days=>$2)${paymentScope}),0)::int AS refunds_adjustments
+           FROM appointments WHERE business_id=$1 AND starts_at >= now()-make_interval(days=>$2)${appointmentScope}`,
           [businessId, days],
         ),
         context.pool.query(
           `SELECT to_char(date_trunc('month', starts_at), 'YYYY-MM') AS month,
                   COALESCE(SUM(total_pence) FILTER (WHERE status IN ('confirmed','completed')),0)::int AS booked,
                   COALESCE(SUM(total_pence) FILTER (WHERE status='completed'),0)::int AS completed
-             FROM appointments WHERE business_id=$1
+             FROM appointments WHERE business_id=$1${appointmentScope}
             GROUP BY date_trunc('month', starts_at) ORDER BY month DESC LIMIT 12`,
           [businessId],
         ),
@@ -338,14 +345,18 @@ export function settingsReportRoutes(context: DatabaseContext) {
 
   router.get('/finances/export.csv', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
+      const appointmentScope = auth.role === 'guest'
+        ? " AND a.booking_source = 'demo-seed'"
+        : '';
       const result = await context.pool.query(
         `SELECT a.starts_at, c.name AS client, ar.name AS artist,
                 COALESCE((SELECT string_agg(service_name, ', ' ORDER BY sort_order)
                   FROM appointment_services WHERE appointment_id=a.id),'Appointment') AS services,
                 a.status, a.payment_status, a.total_pence, a.deposit_pence
            FROM appointments a JOIN clients c ON c.id=a.client_id JOIN artists ar ON ar.id=a.artist_id
-          WHERE a.business_id=$1 ORDER BY a.starts_at DESC`,
+          WHERE a.business_id=$1${appointmentScope} ORDER BY a.starts_at DESC`,
         [businessId],
       );
       response.type('text/csv').attachment('atelier-union-finances.csv').send(

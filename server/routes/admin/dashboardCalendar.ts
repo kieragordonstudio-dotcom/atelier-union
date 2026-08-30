@@ -21,7 +21,8 @@ export function dashboardCalendarRoutes(context: DatabaseContext) {
 
   router.get('/dashboard', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
       const businessResult = await context.pool.query<{ timezone: string }>(
         'SELECT timezone FROM businesses WHERE id = $1',
         [businessId],
@@ -49,7 +50,7 @@ export function dashboardCalendarRoutes(context: DatabaseContext) {
         ),
         context.pool.query(
           `SELECT a.id, a.starts_at, a.ends_at, a.status, a.payment_status,
-                  a.total_pence, a.deposit_pence, a.customer_note, a.internal_notes,
+                  a.total_pence, a.deposit_pence, a.customer_note, a.internal_notes, a.booking_source,
                   c.id AS client_id, c.name AS client_name, c.email, c.phone,
                   ar.id AS artist_id, ar.name AS artist_name,
                   COALESCE((SELECT string_agg(service_name, ', ' ORDER BY sort_order)
@@ -62,7 +63,7 @@ export function dashboardCalendarRoutes(context: DatabaseContext) {
           [businessId, todayStart, todayEnd],
         ),
         context.pool.query(
-          `SELECT a.id, a.starts_at, a.ends_at, a.status, a.payment_status,
+          `SELECT a.id, a.starts_at, a.ends_at, a.status, a.payment_status, a.booking_source,
                   a.total_pence, c.name AS client_name, ar.name AS artist_name,
                   COALESCE((SELECT service_name FROM appointment_services
                     WHERE appointment_id = a.id ORDER BY sort_order LIMIT 1), 'Appointment') AS service_name
@@ -76,14 +77,27 @@ export function dashboardCalendarRoutes(context: DatabaseContext) {
         ),
       ]);
 
+      const protectAppointment = (appointment: Record<string, unknown>) =>
+        auth.role === 'guest' && appointment.booking_source !== 'demo-seed'
+          ? {
+              ...appointment,
+              client_name: 'Private booking',
+              email: null,
+              phone: null,
+              customer_note: '',
+              internal_notes: '',
+            }
+          : appointment;
+      const todayRows = today.rows.map(protectAppointment);
+      const upcomingRows = upcoming.rows.map(protectAppointment);
       response.json({
         metrics: {
           ...metrics.rows[0],
-          todayAppointments: today.rows.filter((item) => item.status !== 'cancelled').length,
-          nextAppointment: upcoming.rows[0] ?? null,
+          todayAppointments: todayRows.filter((item) => item.status !== 'cancelled').length,
+          nextAppointment: upcomingRows[0] ?? null,
         },
-        today: today.rows,
-        upcoming: upcoming.rows,
+        today: todayRows,
+        upcoming: upcomingRows,
       });
     } catch (error) {
       next(error);
@@ -92,7 +106,8 @@ export function dashboardCalendarRoutes(context: DatabaseContext) {
 
   router.get('/calendar', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
       const input = rangeSchema.parse(request.query);
       const artistFilter = input.artistId ? 'AND ar.id = $4' : '';
       const parameters = input.artistId
@@ -138,8 +153,21 @@ export function dashboardCalendarRoutes(context: DatabaseContext) {
         ),
       ]);
       response.json({
-        appointments: appointments.rows,
-        timeOff: blocks.rows,
+        appointments: appointments.rows.map((appointment) =>
+          auth.role === 'guest' && appointment.booking_source !== 'demo-seed'
+            ? {
+                ...appointment,
+                client_name: 'Private booking',
+                email: null,
+                phone: null,
+                customer_note: '',
+                internal_notes: '',
+              }
+            : appointment,
+        ),
+        timeOff: auth.role === 'guest'
+          ? blocks.rows.map((block) => ({ ...block, reason: 'Unavailable' }))
+          : blocks.rows,
         workingHours: hours.rows,
         artists: artistRows.rows,
       });

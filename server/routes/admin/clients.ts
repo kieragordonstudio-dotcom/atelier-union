@@ -19,7 +19,11 @@ export function clientRoutes(context: DatabaseContext) {
 
   router.get('/clients', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
+      const guestScope = auth.role === 'guest'
+        ? " AND c.notes = 'Synthetic demonstration client. Not a real person.'"
+        : '';
       const query = z.string().trim().max(120).default('').parse(request.query.q);
       const result = await context.pool.query(
         `SELECT c.id, c.name, c.email, c.phone, c.notes, c.created_at,
@@ -31,6 +35,7 @@ export function clientRoutes(context: DatabaseContext) {
            LEFT JOIN appointments a ON a.client_id = c.id AND a.business_id = c.business_id
           WHERE c.business_id = $1 AND c.anonymized_at IS NULL
             AND ($2 = '' OR c.name ILIKE '%' || $2 || '%' OR c.email ILIKE '%' || $2 || '%' OR c.phone ILIKE '%' || $2 || '%')
+            ${guestScope}
           GROUP BY c.id
           ORDER BY c.name
           LIMIT 250`,
@@ -44,7 +49,11 @@ export function clientRoutes(context: DatabaseContext) {
 
   router.get('/clients/export.csv', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
+      const guestScope = auth.role === 'guest'
+        ? " AND c.notes = 'Synthetic demonstration client. Not a real person.'"
+        : '';
       const result = await context.pool.query(
         `SELECT c.name, c.email, c.phone, c.notes, c.created_at,
                 COUNT(a.id) FILTER (WHERE a.status = 'completed')::int AS visits,
@@ -52,6 +61,7 @@ export function clientRoutes(context: DatabaseContext) {
            FROM clients c
            LEFT JOIN appointments a ON a.client_id = c.id AND a.business_id = c.business_id
           WHERE c.business_id = $1 AND c.anonymized_at IS NULL
+            ${guestScope}
           GROUP BY c.id ORDER BY c.name`,
         [businessId],
       );
@@ -76,7 +86,11 @@ export function clientRoutes(context: DatabaseContext) {
 
   router.get('/clients/:id', async (request, response, next) => {
     try {
-      const { businessId } = (request as AdminRequest).adminAuth;
+      const auth = (request as AdminRequest).adminAuth;
+      const { businessId } = auth;
+      const guestScope = auth.role === 'guest'
+        ? " AND c.notes = 'Synthetic demonstration client. Not a real person.'"
+        : '';
       const clientResult = await context.pool.query(
         `SELECT c.*,
                 COUNT(a.id) FILTER (WHERE a.status = 'completed')::int AS visits,
@@ -85,6 +99,7 @@ export function clientRoutes(context: DatabaseContext) {
                 COALESCE(SUM(a.total_pence) FILTER (WHERE a.status = 'completed'), 0)::int AS total_spend
            FROM clients c LEFT JOIN appointments a ON a.client_id = c.id
           WHERE c.id = $1 AND c.business_id = $2 AND c.anonymized_at IS NULL
+            ${guestScope}
           GROUP BY c.id`,
         [request.params.id, businessId],
       );

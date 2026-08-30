@@ -41,10 +41,6 @@ const navigation = [
   { to: '/KGD/settings', label: 'Settings', icon: Settings },
 ];
 
-const guestNavigation = navigation.filter(({ label }) =>
-  ['Services', 'Team', 'Lookbook', 'Website', 'Analytics'].includes(label),
-);
-
 function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -108,7 +104,7 @@ function Login({ onLogin }: { onLogin: (user: KgdUser) => void }) {
           </button>
         </form>
         <p className="kgd-help" style={{ marginTop: 24 }}>
-          Explore selected KGD owner-area features using illustrative Atelier Union data. Changes are disabled.
+          Explore the complete KGD owner area using illustrative Atelier Union data. Changes are disabled.
         </p>
         <button className="kgd-button" type="button" disabled={submitting} onClick={() => void enterGuestDemo()}>
           Enter read-only demo
@@ -122,7 +118,6 @@ function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) 
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const guest = user.role === 'guest';
-  const visibleNavigation = guest ? guestNavigation : navigation;
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   return (
@@ -139,7 +134,7 @@ function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) 
           <span>ATELIER UNION</span>
         </div>
         <nav aria-label="KGD navigation">
-          {visibleNavigation.map(({ to, label, icon: Icon, end }) => (
+          {navigation.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}>
               <Icon size={17} aria-hidden="true" />
               {label}
@@ -153,21 +148,21 @@ function KgdLayout({ user, onLogout }: { user: KgdUser; onLogout: () => void }) 
       </aside>
       <main className="kgd-main">
         {guest ? <p className="kgd-status">Guest preview · Read-only access</p> : null}
-        <fieldset className="kgd-guest-content" disabled={guest}>
+        <div className="kgd-guest-content">
           <Routes>
-            <Route index element={guest ? <Navigate to="/KGD/services" replace /> : <DashboardPage />} />
-            <Route path="calendar" element={guest ? <Navigate to="/KGD/services" replace /> : <CalendarPage />} />
-            <Route path="clients" element={guest ? <Navigate to="/KGD/services" replace /> : <ClientsPage />} />
+            <Route index element={<DashboardPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="clients" element={<ClientsPage />} />
             <Route path="services" element={<ServicesPage />} />
             <Route path="team" element={<TeamPage />} />
             <Route path="lookbook" element={<LookbookPage />} />
             <Route path="website" element={<WebsitePage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="finances" element={guest ? <Navigate to="/KGD/services" replace /> : <FinancesPage />} />
-            <Route path="settings" element={guest ? <Navigate to="/KGD/services" replace /> : <SettingsPage user={user} onLogout={onLogout} />} />
-            <Route path="*" element={<Navigate to={guest ? '/KGD/services' : '/KGD'} replace />} />
+            <Route path="finances" element={<FinancesPage />} />
+            <Route path="settings" element={<SettingsPage user={user} onLogout={onLogout} />} />
+            <Route path="*" element={<Navigate to="/KGD" replace />} />
           </Routes>
-        </fieldset>
+        </div>
       </main>
     </div>
   );

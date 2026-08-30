@@ -11,14 +11,28 @@ import { teamRoutes } from './admin/team.js';
 export function adminRoutes(context: DatabaseContext) {
   const router = Router();
   router.use(requireAdmin(context.db));
-  const guestRoutes = new Set(['/services', '/team', '/lookbook', '/website', '/analytics']);
+  const guestRoutes = new Set([
+    '/dashboard',
+    '/calendar',
+    '/clients',
+    '/clients/export.csv',
+    '/services',
+    '/team',
+    '/lookbook',
+    '/website',
+    '/analytics',
+    '/finances',
+    '/finances/export.csv',
+    '/settings',
+  ]);
   router.use((request, response, next) => {
     const auth = (request as AdminRequest).adminAuth;
     if (auth.role !== 'guest') {
       next();
       return;
     }
-    if (request.method === 'GET' && guestRoutes.has(request.path)) {
+    const guestClientDetail = /^\/clients\/[0-9a-f-]+$/i.test(request.path);
+    if (request.method === 'GET' && (guestRoutes.has(request.path) || guestClientDetail)) {
       next();
       return;
     }
