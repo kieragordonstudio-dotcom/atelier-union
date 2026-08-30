@@ -373,6 +373,19 @@ try {
       throw new Error('Artists and services must exist before demo activity can be seeded.');
     }
 
+    await tx
+      .update(clients)
+      .set({ notes: 'Synthetic demonstration client. Not a real person.' })
+      .where(
+        and(
+          eq(clients.businessId, business.id),
+          inArray(
+            clients.normalizedEmail,
+            demoClients.map(([, email]) => email.toLowerCase()),
+          ),
+        ),
+      );
+
     const preferredServiceSlugs = [
       'signature-gel',
       'builder-gel-new',
