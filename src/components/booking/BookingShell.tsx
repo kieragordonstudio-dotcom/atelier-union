@@ -562,6 +562,11 @@ function ArtistStep({
   onBack: () => void;
   onNext: () => void;
 }) {
+  function chooseArtist(id: ArtistChoice) {
+    setArtistId(id);
+    onNext();
+  }
+
   return (
     <>
       <h1 className="serif" style={{ fontSize: 'var(--step-3)' }}>
@@ -571,7 +576,7 @@ function ArtistStep({
         <button
           type="button"
           className={`option-button simple-row artist-choice-row ${artistId === 'any' ? 'is-selected' : ''}`}
-          onClick={() => setArtistId('any')}
+          onClick={() => chooseArtist('any')}
         >
           <h3>Any Nail Artist</h3>
           <p>See availability across all Nail Artists.</p>
@@ -583,7 +588,7 @@ function ArtistStep({
             }`}
             key={artist.id}
             type="button"
-            onClick={() => setArtistId(artist.id as ArtistChoice)}
+            onClick={() => chooseArtist(artist.id as ArtistChoice)}
           >
             <h3>{artist.name}</h3>
             <p>{artist.specialties.join(', ')}</p>
